@@ -27,7 +27,10 @@ export const orderLink = (text: string) => `https://t.me/${config.orderContact}?
 
 const pagesKeyboard = () => kb([...grid(Array.from({ length: 10 }, (_, i) => btn(String(i + 1), `ord:p:${i + 1}`)), 5), [btn("✖️ Отмена", "ord:x")]]);
 
+export const ORDERS_SOON = "📝 <b>Конспекты</b>\n\nЗаказ конспектов пока недоступен — появится чуть позже! Следи за обновлениями 🙌";
+
 export async function startOrder(chatId: number, user: User) {
+  if (!config.ordersEnabled) return send(chatId, ORDERS_SOON);
   if (!user.grp) return send(chatId, "Сначала выбери группу: /start");
   const subjects = groupSubjects(user.grp);
   setSession(chatId, { kind: "order", step: "subject", data: { subjects } });
@@ -39,6 +42,10 @@ export async function startOrder(chatId: number, user: User) {
 }
 
 export async function orderCallback(chatId: number, messageId: number, data: string, user: User, session: Session | null) {
+  if (!config.ordersEnabled) {
+    clearSession(chatId);
+    return edit(chatId, messageId, ORDERS_SOON);
+  }
   if (data === "ord:x") {
     clearSession(chatId);
     return edit(chatId, messageId, "Заказ отменён.");

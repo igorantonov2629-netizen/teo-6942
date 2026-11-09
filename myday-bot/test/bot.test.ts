@@ -160,7 +160,16 @@ describe("заказ конспекта", () => {
     expect(text).toContain("Страниц: 6 · без очереди\nИтого: 450 ₽");
     expect(orderLink(text)).toStartWith("https://t.me/sanekhelper?text=");
   });
+  test("пока выключено — «появится чуть позже»", async () => {
+    delete process.env.ORDERS_ENABLED;
+    await register(21, "501.11");
+    calls = [];
+    await msg(21, "📝 Заказать конспект");
+    expect(textOf(sent(21)[0])).toContain("пока недоступен — появится чуть позже");
+    expect(getDb().query("SELECT * FROM sessions").all()).toHaveLength(0);
+  });
   test("полный сценарий через кнопки", async () => {
+    process.env.ORDERS_ENABLED = "1";
     await register(20, "502.21");
     await msg(20, "📝 Заказать конспект");
     expect(groupSubjects("502.21")).toContain("Механика");

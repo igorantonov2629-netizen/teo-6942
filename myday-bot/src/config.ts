@@ -22,6 +22,10 @@ export const config = {
   get upperWeekStart() {
     return process.env.UPPER_WEEK_START || "2026-11-09";
   },
+  /** Заказ конспектов включён? Пока выключен: ORDERS_ENABLED=1 — включить. */
+  get ordersEnabled() {
+    return process.env.ORDERS_ENABLED === "1";
+  },
   /** Поддержка (username без @). */
   get supportContact() {
     return (process.env.SUPPORT_CONTACT || "sanekhelper").replace(/^@/, "");
