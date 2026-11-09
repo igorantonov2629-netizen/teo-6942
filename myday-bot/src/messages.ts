@@ -5,7 +5,6 @@ import { addDays, dowOf, fmtHM, mondayOf, ruDate, ruDayDate, WEEKDAYS } from "./
 
 const NUM = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣"];
 export const NO_MENU = "Меню на сегодня пока неизвестно — как появится, сразу оповестим!";
-const NO_MENU_INLINE = "меню на сегодня пока неизвестно — как появится, сразу оповестим!";
 
 /** Экранирование для parse_mode HTML. */
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -45,10 +44,20 @@ export function dayBlock(grp: string, date: string): { text: string; count: numb
   return { text: lines.length ? `${head}\n\n${lines.join("\n")}` : `${head}\n\nЗанятий нет 🎉`, count };
 }
 
+/** Блюда из базы: построчно; старый формат «через запятую» тоже понимаем. */
+export function dishList(raw: string): string[] {
+  const lines = raw.includes("\n") ? raw.split("\n") : raw.split(/,\s*/);
+  return lines.map((s) => s.trim()).filter(Boolean);
+}
+
+/** Блок приёма пищи: заголовок со временем и блюда списком. */
 export function mealLine(meal: Meal, menu: Menu | null, dow: number) {
   const m = MEALS.find((x) => x.key === meal)!;
+  const head = `${m.emoji} <b>${m.title}</b> · ${fmtHM(mealTime(meal, dow))}`;
   const dish = menu?.[meal];
-  return `${m.emoji} ${m.title} (${fmtHM(mealTime(meal, dow))}): ${dish ? esc(dish) : NO_MENU_INLINE}`;
+  if (!dish) return `${head}\n${NO_MENU}`;
+  const body = dishList(dish).map((d) => (d.endsWith(":") ? `\n<i>${esc(d)}</i>` : `  • ${esc(d)}`));
+  return [head, ...body].join("\n");
 }
 
 export const dutyLine = (date: string) => {
@@ -61,7 +70,7 @@ export function morningText(grp: string, date: string) {
   const dow = dowOf(date);
   const menu = getMenu(date);
   const { text } = dayBlock(grp, date);
-  return [`☀️ <b>Доброе утро! ${ruDayDate(date)}</b>`, text, "", mealLine("breakfast", menu, dow), dutyLine(date)].join("\n");
+  return [`☀️ <b>Доброе утро! ${ruDayDate(date)}</b>`, text, "", mealLine("breakfast", menu, dow), "", dutyLine(date)].join("\n");
 }
 
 /** Кнопка «Сегодня». */
@@ -99,7 +108,7 @@ export function menuText(date: string) {
   const menu = getMenu(date);
   const dow = dowOf(date);
   if (!menu) return `🍽 <b>Меню на ${ruDate(date)}</b>\n${NO_MENU}`;
-  return [`🍽 <b>Меню на ${ruDate(date)}</b>`, ...MEALS.map((m) => mealLine(m.key, menu, dow))].join("\n");
+  return [`🍽 <b>Меню на ${ruDate(date)}</b>`, ...MEALS.map((m) => mealLine(m.key, menu, dow))].join("\n\n");
 }
 
 /** Сообщение перед обедом/ужином. */

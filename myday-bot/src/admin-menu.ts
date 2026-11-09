@@ -6,9 +6,44 @@ import { addDays, daysInMonth, dowOf, hm, localNow, MONTHS_NOM, ruDate, type Loc
 
 // ======================= МЕНЮ =======================
 
-/** «Завтрак: …\nОбед: …\nУжин: …». Первая строка «завтра» — меню на завтра. */
+/** Делит строку на блюда по запятым (кроме запятых в скобках и кавычках). */
+export function splitDishes(text: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = "";
+  for (const ch of text) {
+    if ("(«".includes(ch)) depth++;
+    if (")»".includes(ch)) depth = Math.max(0, depth - 1);
+    if ((ch === "," || ch === ";") && depth === 0) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(cleanDish).filter(Boolean);
+}
+
+/** Убирает граммовку в конце («Борщ 10/25/300», «Яйцо 1шт.») и точку, делает первую букву заглавной. */
+export function cleanDish(s: string) {
+  const t = s
+    .trim()
+    .replace(/\s+\d+([.,/]\d+)*\s*(шт\.?|гр?\.?|мл\.?)?$/i, "")
+    .replace(/[.\s]+$/, "")
+    .trim();
+  return t ? t[0].toUpperCase() + t.slice(1) : "";
+}
+
+const MEAL_HEAD = /^(завтрак|обед|ужин)(?=\s*([:\-—–]|$))\s*[:\-—–]?\s*(.*)$/i;
+const BREAKFAST2 = /^(завтрак\s*2|второй\s+завтрак)\s*(\([^)]*\))?\s*[:\-—–]?\s*(.*)$/i;
+const SNACK = /^полдник\s*(\([^)]*\))?\s*[:\-—–]?\s*(.*)$/i;
+
+/**
+ * «Завтрак: …\nОбед: …\nУжин: …» — блюда через запятую или каждое с новой строки.
+ * «Завтрак 2 (…)» идёт подзаголовком в завтрак, блюда полдника — просто в обед.
+ * Первая строка «завтра» — меню на завтра. Блюда хранятся построчно; строка с «:» в конце — подзаголовок.
+ */
 export function parseMenu(text: string): { menu: Menu; tomorrow: boolean } | null {
-  const menu: Menu = { breakfast: null, lunch: null, dinner: null };
+  const items: Record<keyof Menu, string[]> = { breakfast: [], lunch: [], dinner: [] };
   let tomorrow = false;
   let last: keyof Menu | null = null;
   for (const raw of text.split("\n")) {
@@ -18,12 +53,24 @@ export function parseMenu(text: string): { menu: Menu; tomorrow: boolean } | nul
       tomorrow = true;
       continue;
     }
-    const m = line.match(/^(завтрак|обед|ужин)\s*[:\-—–]?\s*(.*)$/i);
-    if (m) {
+    let m: RegExpMatchArray | null;
+    if ((m = line.match(BREAKFAST2))) {
+      last = "breakfast";
+      items.breakfast.push(`Завтрак 2${m[2] ? ` ${m[2]}` : ""}:`);
+      items.breakfast.push(...splitDishes(m[3]));
+    } else if ((m = line.match(SNACK))) {
+      last = "lunch";
+      items.lunch.push(...splitDishes(m[2]));
+    } else if ((m = line.match(MEAL_HEAD))) {
       last = ({ завтрак: "breakfast", обед: "lunch", ужин: "dinner" } as const)[m[1].toLowerCase() as "завтрак" | "обед" | "ужин"];
-      menu[last] = m[2].trim() || null;
-    } else if (last) menu[last] = [menu[last], line].filter(Boolean).join(", ");
+      items[last].push(...splitDishes(m[3]));
+    } else if (last) items[last].push(...splitDishes(line));
   }
+  const menu: Menu = {
+    breakfast: items.breakfast.join("\n") || null,
+    lunch: items.lunch.join("\n") || null,
+    dinner: items.dinner.join("\n") || null,
+  };
   return menu.breakfast || menu.lunch || menu.dinner ? { menu, tomorrow } : null;
 }
 
@@ -37,7 +84,7 @@ export async function applyMenu(date: string, menu: Menu, now: LocalNow = localN
   if (date !== now.date || now.minutes < morningAt(now.dow)) return { sent: 0, note: "Разошлю вместе с утренним сообщением и перед приёмами пищи." };
   const left = MEALS.filter((m) => menu[m.key] && mealTime(m.key, now.dow) > now.minutes);
   if (!left.length) return { sent: 0, note: "Все приёмы пищи на сегодня уже прошли — рассылки не было." };
-  const text = [existed ? "🔄 <b>Меню обновлено</b>" : "🍽 <b>Меню на сегодня появилось!</b>", ...left.map((m) => mealLine(m.key, menu, now.dow))].join("\n");
+  const text = [existed ? "🔄 <b>Меню обновлено</b>" : "🍽 <b>Меню на сегодня появилось!</b>", ...left.map((m) => mealLine(m.key, menu, now.dow))].join("\n\n");
   const sent = await broadcast(audienceChatIds({ type: "all" }), (id) => send(id, text));
   return { sent, note: `Разослано: ${sent}.` };
 }
@@ -55,8 +102,8 @@ export async function handleMenuText(chatId: number, text: string) {
   const now = localNow();
   const date = parsed.tomorrow ? addDays(now.date, 1) : now.date;
   const res = await applyMenu(date, parsed.menu, now);
-  const preview = MEALS.map((m) => mealLine(m.key, parsed.menu, dowOf(date))).join("\n");
-  await send(chatId, `✅ Меню на ${ruDate(date)} сохранено.\n${preview}\n\n${res.note}`);
+  const preview = MEALS.map((m) => mealLine(m.key, parsed.menu, dowOf(date))).join("\n\n");
+  await send(chatId, `✅ Меню на ${ruDate(date)} сохранено.\n\n${preview}\n\n${res.note}`);
 }
 
 // ======================= ДЕЖУРНЫЕ =======================
