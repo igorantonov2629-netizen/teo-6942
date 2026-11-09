@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS ad_clicks (
   chat_id INTEGER NOT NULL,
   PRIMARY KEY (ad_id, chat_id)
 );
+CREATE TABLE IF NOT EXISTS meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS jobs_done (
   key TEXT PRIMARY KEY,
   at INTEGER NOT NULL
@@ -251,3 +255,16 @@ export function claimJob(key: string) {
 
 export const purgeOldJobs = () =>
   getDb().query("DELETE FROM jobs_done WHERE at < ?").run(Date.now() - 14 * 24 * 3600 * 1000);
+
+// ---------- служебное ----------
+export const getMeta = (key: string) =>
+  getDb().query<{ value: string }, [string]>("SELECT value FROM meta WHERE key = ?").get(key)?.value ?? null;
+export const setMeta = (key: string, value: string) =>
+  getDb().query("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+
+/**
+ * Следующий update_id, который ещё не обработан. Сохраняется ДО обработки:
+ * после перезапуска бот не ответит второй раз на уже обработанное нажатие.
+ */
+export const getUpdateOffset = () => Number(getMeta("update_offset") ?? 0);
+export const setUpdateOffset = (offset: number) => setMeta("update_offset", String(offset));

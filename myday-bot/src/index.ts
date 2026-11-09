@@ -1,5 +1,5 @@
 import { config } from "./config";
-import { openDb } from "./db";
+import { getUpdateOffset, openDb, setUpdateOffset } from "./db";
 import { seedDuties } from "./admin-menu";
 import { handleUpdate } from "./bot";
 import { startScheduler, stopScheduler } from "./scheduler";
@@ -56,12 +56,14 @@ async function setup() {
 let stopping = false;
 
 async function poll() {
-  let offset = 0;
+  let offset = getUpdateOffset();
   while (!stopping) {
     try {
       const updates = await tg<TgUpdate[]>("getUpdates", { offset, timeout: 30, allowed_updates: ["message", "callback_query"] });
       for (const u of updates) {
+        if (u.update_id < offset) continue; // уже обработано до перезапуска
         offset = u.update_id + 1;
+        setUpdateOffset(offset);
         try {
           await handleUpdate(u);
         } catch (e) {
