@@ -1,4 +1,4 @@
-import { audienceChatIds, clearSession, getDb, getDuty, getMenu, saveDuties, saveMenu, setSession, type Menu, type Session } from "./db";
+import { audienceChatIds, clearSession, getDb, getDuty, getMenu, saveDuties, saveMenu, setSession, type DutyKind, type Menu, type Session } from "./db";
 import { esc, mealLine } from "./messages";
 import { MEALS, mealTime } from "./schedule";
 import { broadcast, btn, edit, kb, send } from "./telegram";
@@ -127,11 +127,12 @@ function monthChoice(now: LocalNow) {
   ];
 }
 
+const KIND_LABEL: Record<DutyKind, string> = { mik: "по МИК", mgu: "по МГУ" };
+
 export async function startDuties(chatId: number, rest: string) {
-  const months = monthChoice(localNow());
-  setSession(chatId, { kind: "admin_duty", step: "month", data: { list: rest.trim() } });
-  await send(chatId, "На какой месяц загружаем дежурных по МИК?", {
-    reply_markup: kb([months.map((x) => btn(`${MONTHS_NOM[x.m - 1]} ${x.y}`, `duty:m:${x.y}-${String(x.m).padStart(2, "0")}`)), [btn("✖️ Отмена", "duty:x")]]),
+  setSession(chatId, { kind: "admin_duty", step: "kind", data: { list: rest.trim() } });
+  await send(chatId, "Какой список дежурных загружаем?", {
+    reply_markup: kb([[btn("Дежурный по МИК", "duty:k:mik"), btn("Дежурный по МГУ", "duty:k:mgu")], [btn("✖️ Отмена", "duty:x")]]),
   });
 }
 
@@ -140,36 +141,47 @@ export async function dutyCallback(chatId: number, messageId: number, data: stri
     clearSession(chatId);
     return edit(chatId, messageId, "Отменено.");
   }
-  const month = data.split(":")[2];
+  const [, step, value] = data.split(":");
+  if (step === "k" && (value === "mik" || value === "mgu")) {
+    setSession(chatId, { ...session, step: "month", data: { ...session.data, dutyKind: value } });
+    const months = monthChoice(localNow());
+    return edit(chatId, messageId, `Дежурные <b>${KIND_LABEL[value]}</b>. На какой месяц?`, kb([
+      months.map((x) => btn(`${MONTHS_NOM[x.m - 1]} ${x.y}`, `duty:m:${x.y}-${String(x.m).padStart(2, "0")}`)),
+      [btn("✖️ Отмена", "duty:x")],
+    ]));
+  }
+  if (step !== "m") return;
+  const month = value;
+  const kind = (session.data.dutyKind as DutyKind) || "mik";
   const list = String(session.data.list || "");
   if (list) {
-    await edit(chatId, messageId, `Месяц: ${month}`);
-    return saveDutyList(chatId, month, list);
+    await edit(chatId, messageId, `Дежурные ${KIND_LABEL[kind]}, месяц: ${month}`);
+    return saveDutyList(chatId, month, list, kind);
   }
-  setSession(chatId, { kind: "admin_duty", step: "list", data: { month } });
-  await edit(chatId, messageId, `Месяц: <b>${month}</b>\nПришли список из столбца «Деж. по МИК»:\n\n<code>1 Борт\n2 Ельцов\n3 Семенко\n…</code>`);
+  setSession(chatId, { kind: "admin_duty", step: "list", data: { month, dutyKind: kind } });
+  await edit(chatId, messageId, `Дежурные <b>${KIND_LABEL[kind]}</b>, месяц <b>${month}</b>.\nПришли список из графика нарядов (столбец «Деж. ${KIND_LABEL[kind].replace("по ", "по ")}»):\n\n<code>1 Борт\n2 Ельцов\n3 Семенко\n…</code>`);
 }
 
-export async function saveDutyList(chatId: number, month: string, text: string) {
+export async function saveDutyList(chatId: number, month: string, text: string, kind: DutyKind = "mik") {
   const items = parseDuties(text);
   if (!items.length) return send(chatId, "Не нашёл строк вида «1 Фамилия». Пришли ещё раз или /cancel.");
   clearSession(chatId);
   const [y, m] = month.split("-").map(Number);
   const total = daysInMonth(y, m);
   const valid = items.filter((i) => i.day <= total);
-  saveDuties(valid.map((i) => ({ date: `${month}-${String(i.day).padStart(2, "0")}`, name: i.name })));
-  const missing = missingDutyDays(month);
+  saveDuties(valid.map((i) => ({ date: `${month}-${String(i.day).padStart(2, "0")}`, name: i.name })), kind);
+  const missing = missingDutyDays(month, kind);
   await send(
     chatId,
-    `✅ Сохранено дежурных: ${valid.length} (${MONTHS_NOM[m - 1]} ${y}).` +
+    `✅ Сохранено дежурных ${KIND_LABEL[kind]}: ${valid.length} (${MONTHS_NOM[m - 1]} ${y}).` +
       (missing.length ? `\n⚠️ Не указан дежурный на: ${missing.join(", ")}.` : "\nВсе дни месяца заполнены."),
   );
 }
 
-export function missingDutyDays(month: string) {
+export function missingDutyDays(month: string, kind: DutyKind = "mik") {
   const [y, m] = month.split("-").map(Number);
   const missing: number[] = [];
-  for (let d = 1; d <= daysInMonth(y, m); d++) if (!getDuty(`${month}-${String(d).padStart(2, "0")}`)) missing.push(d);
+  for (let d = 1; d <= daysInMonth(y, m); d++) if (!getDuty(`${month}-${String(d).padStart(2, "0")}`, kind)) missing.push(d);
   return missing;
 }
 

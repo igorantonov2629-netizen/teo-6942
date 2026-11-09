@@ -16,11 +16,12 @@ openDb();
 seedDuties();
 
 const STUDENT_COMMANDS = [
+  { command: "schedule", description: "Расписание: сегодня, завтра, неделя" },
   { command: "today", description: "Пары на сегодня" },
   { command: "tomorrow", description: "Пары на завтра" },
   { command: "week", description: "Расписание на неделю" },
   { command: "menu", description: "Меню столовой" },
-  { command: "duty", description: "Дежурный сегодня" },
+  { command: "duty", description: "Дежурные по МИК и МГУ" },
   { command: "order", description: "Заказать конспект" },
   { command: "settings", description: "Группа и уведомления" },
   { command: "support", description: "Поддержка" },

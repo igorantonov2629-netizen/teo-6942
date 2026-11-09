@@ -1,4 +1,4 @@
-import { getDuty, getMenu, type Menu } from "./db";
+import { getDuty, getMenu, listAbsences, type Menu } from "./db";
 import { dayPairs, MEALS, mealTime, PAIRS, place, weekLabel, weekType, type DayPair, type Meal } from "./schedule";
 import type { Lesson } from "./schedule-data";
 import { addDays, dowOf, fmtHM, mondayOf, ruDate, ruDayDate, WEEKDAYS } from "./time";
@@ -8,6 +8,22 @@ export const NO_MENU = "Меню на сегодня пока неизвестн
 
 /** Экранирование для parse_mode HTML. */
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Фамилия преподавателя в нижнем регистре: «Малышев С.А.» → «малышев». */
+export const surnameKey = (teacher: string) => teacher.trim().split(/\s+/)[0].toLowerCase().replace(/ё/g, "е");
+
+/** «Малышев С.А. заболел» / «Петрова В.О. заболела». */
+export function sickPhrase(name: string) {
+  const female = /(ая|а)$/i.test(name.trim().split(/\s+/)[0]);
+  return `${name} ${female ? "заболела" : "заболел"}`;
+}
+
+/** Если преподаватель пары болеет — его имя из списка, иначе null. */
+export function sickTeacher(l: Lesson | null): string | null {
+  if (!l?.teacher) return null;
+  const key = surnameKey(l.teacher);
+  return listAbsences().find((a) => a.key === key)?.name ?? null;
+}
 
 export function pairsWord(n: number) {
   if (n === 0) return "пар нет";
@@ -31,7 +47,12 @@ function pairLines(p: DayPair): string[] {
   if (!p.lesson) return [];
   const mark = p.change?.kind === "replace" ? " ⚠️ <i>замена</i>" : "";
   const details = lessonDetails(p.lesson);
-  return [`${NUM[p.n]} ${pairTime(p.n)} <b>${esc(p.lesson.subject)}</b>${mark}`, ...(details ? [`      ${esc(details)}`] : [])];
+  const sick = sickTeacher(p.lesson);
+  return [
+    `${NUM[p.n]} ${pairTime(p.n)} <b>${esc(p.lesson.subject)}</b>${mark}`,
+    ...(details ? [`      ${esc(details)}`] : []),
+    ...(sick ? [`      🤒 <i>${esc(sickPhrase(sick))}</i>`] : []),
+  ];
 }
 
 /** Блок с парами на день (без заголовка-приветствия). */
@@ -60,9 +81,13 @@ export function mealLine(meal: Meal, menu: Menu | null, dow: number) {
   return [head, ...body].join("\n");
 }
 
+/** Строка(и) дежурных для утреннего сообщения. По МГУ — только если указан. */
 export const dutyLine = (date: string) => {
-  const name = getDuty(date);
-  return name ? `🎖 Сегодня заступает: ${esc(name)}` : "🎖 Дежурный на сегодня пока не указан";
+  const mik = getDuty(date, "mik");
+  const mgu = getDuty(date, "mgu");
+  const lines = [mik ? `🎖 Сегодня заступает: ${esc(mik)}` : "🎖 Дежурный по МИК на сегодня пока не указан"];
+  if (mgu) lines.push(`⚓️ Дежурный по МГУ: ${esc(mgu)}`);
+  return lines.join("\n");
 };
 
 /** Утреннее сообщение (7:00, в воскресенье 8:00). */
@@ -97,7 +122,8 @@ export function weekText(grp: string, today: string) {
       if (p.change?.kind === "cancel") return [`  ${p.n}. ❌ отменена`];
       if (!p.lesson) return [];
       const room = place(p.lesson);
-      return [`  ${p.n}. ${esc(p.lesson.subject)}${p.change ? " ⚠️" : ""}${room ? ` — ${esc(room)}` : ""}`];
+      const sick = sickTeacher(p.lesson);
+      return [`  ${p.n}. ${esc(p.lesson.subject)}${p.change ? " ⚠️" : ""}${room ? ` — ${esc(room)}` : ""}${sick ? ` · 🤒 ${esc(sickPhrase(sick))}` : ""}`];
     });
     out.push("", `<b>${WEEKDAYS[i]}, ${ruDate(date)}</b>`, ...(lines.length ? lines : ["  пар нет"]));
   }
@@ -119,10 +145,17 @@ export function mealReminderText(meal: Meal, date: string) {
 export function pairReminderText(p: DayPair) {
   const l = p.lesson!;
   const where = place(l);
-  return `⏰ Через 10 минут ${p.n} пара\n<b>${esc(l.subject)}</b>${where ? ` — ${esc(where)}` : ""}`;
+  const sick = sickTeacher(l);
+  return `⏰ Через 10 минут ${p.n} пара\n<b>${esc(l.subject)}</b>${where ? ` — ${esc(where)}` : ""}${sick ? `\n🤒 ${esc(sickPhrase(sick))}` : ""}`;
 }
 
 export const dutyText = (date: string) => {
-  const name = getDuty(date);
-  return name ? `🎖 Сегодня (${ruDate(date)}) заступает: <b>${esc(name)}</b>` : "🎖 Дежурный на сегодня пока не указан.";
+  const mik = getDuty(date, "mik");
+  const mgu = getDuty(date, "mgu");
+  return [
+    `🎖 <b>Дежурные на ${ruDate(date)}</b>`,
+    "",
+    `По МИК: ${mik ? `<b>${esc(mik)}</b>` : "пока не указан"}`,
+    `По МГУ: ${mgu ? `<b>${esc(mgu)}</b>` : "пока не указан"}`,
+  ].join("\n");
 };

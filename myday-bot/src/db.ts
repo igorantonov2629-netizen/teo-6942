@@ -38,6 +38,15 @@ CREATE TABLE IF NOT EXISTS duties (
   date TEXT PRIMARY KEY,
   name TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS duties_mgu (
+  date TEXT PRIMARY KEY,
+  name TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS absences (
+  key TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS overrides (
   grp TEXT NOT NULL,
   date TEXT NOT NULL,
@@ -197,14 +206,25 @@ export const saveMenu = (date: string, m: Menu) =>
     .run(date, m.breakfast, m.lunch, m.dinner, Date.now());
 
 // ---------- дежурные ----------
-export const getDuty = (date: string) =>
-  getDb().query<{ name: string }, [string]>("SELECT name FROM duties WHERE date = ?").get(date)?.name ?? null;
+/** mik — дежурный по МИК, mgu — дежурный по МГУ. */
+export type DutyKind = "mik" | "mgu";
+const dutyTable = (kind: DutyKind) => (kind === "mgu" ? "duties_mgu" : "duties");
 
-export function saveDuties(entries: { date: string; name: string }[]) {
+export const getDuty = (date: string, kind: DutyKind = "mik") =>
+  getDb().query<{ name: string }, [string]>(`SELECT name FROM ${dutyTable(kind)} WHERE date = ?`).get(date)?.name ?? null;
+
+export function saveDuties(entries: { date: string; name: string }[], kind: DutyKind = "mik") {
   const d = getDb();
-  const stmt = d.query("INSERT INTO duties (date, name) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET name = excluded.name");
+  const stmt = d.query(`INSERT INTO ${dutyTable(kind)} (date, name) VALUES (?, ?) ON CONFLICT(date) DO UPDATE SET name = excluded.name`);
   d.transaction(() => entries.forEach((e) => stmt.run(e.date, e.name)))();
 }
+
+// ---------- болеющие преподаватели ----------
+export type Absence = { key: string; name: string };
+export const listAbsences = () => getDb().query<Absence, []>("SELECT key, name FROM absences ORDER BY name").all();
+export const addAbsence = (key: string, name: string) =>
+  getDb().query("INSERT INTO absences (key, name, created_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET name = excluded.name").run(key, name, Date.now());
+export const removeAbsence = (key: string) => getDb().query("DELETE FROM absences WHERE key = ?").run(key).changes > 0;
 
 // ---------- замены ----------
 export type Override = { grp: string; date: string; pair: number; kind: "cancel" | "replace"; subject: string | null; room: string | null; teacher: string | null };

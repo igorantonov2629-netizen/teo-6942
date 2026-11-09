@@ -75,7 +75,7 @@ describe("верхняя/нижняя неделя", () => {
     expect(text).toContain("Группа 501.21 · верхняя неделя · 3 пары");
     expect(text).toContain("Техническая механика");
     expect(text).toContain("каб. 216, корпус 8 · Полисадина Е.В.");
-    expect(text).toContain("Дежурный на сегодня пока не указан");
+    expect(text).toContain("Дежурный по МИК на сегодня пока не указан");
     expect(dayPairs("501.21", "2026-11-17")[3].lesson?.subject).toBe("Электротехника и электроника");
   });
   test("дежурный и меню в утреннем сообщении", () => {
@@ -185,6 +185,69 @@ describe("заказ конспекта", () => {
     expect(decodeURIComponent(url)).toContain("Предмет: Механика");
     // данные заказа не остаются в базе
     expect(getDb().query("SELECT * FROM sessions").all()).toHaveLength(0);
+  });
+});
+
+describe("вкладка «Расписание»", () => {
+  test("сразу показывает сегодня, кнопки переключают завтра/неделю", async () => {
+    await register(90, "501.21");
+    calls = [];
+    await msg(90, "📅 Расписание");
+    const c = sent(90)[0];
+    expect(textOf(c)).toContain("Сегодня,");
+    const row = c.params.reply_markup.inline_keyboard[0].map((b: any) => b.callback_data);
+    expect(row).toEqual(["sch:today", "sch:tom", "sch:week"]);
+    calls = [];
+    await cb(90, "sch:week");
+    const e = calls.find((x) => x.method === "editMessageText")!;
+    expect(e.params.text).toContain("Неделя");
+    expect(e.params.reply_markup.inline_keyboard[0][2].text).toBe("• Неделя •");
+  });
+  test("старая кнопка «Сегодня» тоже работает и обновляет клавиатуру", async () => {
+    await register(91, "501.21");
+    calls = [];
+    await msg(91, "📅 Сегодня");
+    expect(sent(91).some((c) => textOf(c).includes("Сегодня,"))).toBe(true);
+  });
+});
+
+describe("дежурные по МИК и МГУ", () => {
+  test("кнопка показывает обоих", async () => {
+    const { saveDuties } = await import("../src/db");
+    const { dutyText } = await import("../src/messages");
+    saveDuties([{ date: "2026-11-09", name: "Борт" }], "mik");
+    saveDuties([{ date: "2026-11-09", name: "Иванов" }], "mgu");
+    const t = dutyText("2026-11-09");
+    expect(t).toContain("По МИК: <b>Борт</b>");
+    expect(t).toContain("По МГУ: <b>Иванов</b>");
+    expect(dutyText("2026-11-10")).toContain("По МГУ: пока не указан");
+  });
+  test("админ загружает список по МГУ", async () => {
+    const { getDuty } = await import("../src/db");
+    await msg(1, "/дежурные");
+    await cb(1, "duty:k:mgu");
+    await cb(1, "duty:m:2026-11");
+    await msg(1, "1 Иванов\n2 Петров");
+    expect(getDuty("2026-11-02", "mgu")).toBe("Петров");
+    expect(getDuty("2026-11-02", "mik")).toBeNull();
+  });
+});
+
+describe("болеющий преподаватель", () => {
+  test("/болеет Малышев — пометка во всех его парах, /вышел — убирает", async () => {
+    const { todayText, weekText } = await import("../src/messages");
+    await msg(1, "/болеет малышев");
+    expect(textOf(sent(1).at(-1)!)).toContain("Малышев С.А. заболел");
+    const t = todayText("501.21", "2026-11-10");
+    expect(t).toContain("🤒 <i>Малышев С.А. заболел</i>");
+    expect(t.match(/заболел/g)).toHaveLength(1); // только у пары Малышева
+    expect(weekText("501.23", "2026-11-10")).toContain("🤒 Малышев С.А. заболел");
+    await msg(1, "/вышел Малышев");
+    expect(todayText("501.21", "2026-11-10")).not.toContain("заболел");
+  });
+  test("женская фамилия — «заболела»", async () => {
+    const { sickPhrase } = await import("../src/messages");
+    expect(sickPhrase("Петрова В.О.")).toBe("Петрова В.О. заболела");
   });
 });
 

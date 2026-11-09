@@ -3,9 +3,10 @@ import { clearSession, ensureUser, getDb, getSession, getUser } from "./db";
 import { handleMenuText, parseMenu, saveDutyList, startDuties, startMenu, dutyCallback } from "./admin-menu";
 import { adCallback, adClick, adMessage, annCallback, annMessage, listAds, startAd, startAnnouncement, stopAd } from "./admin-post";
 import { startSub, subCallback, subText } from "./admin-sub";
+import { markBack, markSick, sickList } from "./admin-sick";
 import { esc } from "./messages";
 import { orderCallback, orderText, startOrder } from "./order";
-import { BUTTONS, mainKeyboard, registrationCallback, settingsCallback, startRegistration, studentCommand } from "./student";
+import { BUTTONS, mainKeyboard, registrationCallback, scheduleCallback, settingsCallback, startRegistration, studentCommand } from "./student";
 import { answer, edit, send } from "./telegram";
 import type { TgCallback, TgMessage, TgUpdate } from "./types";
 
@@ -21,6 +22,11 @@ const ADMIN_COMMANDS: Record<string, (chatId: number, rest: string) => Promise<u
   "/реклама": (id) => startAd(id),
   "/ad": (id) => startAd(id),
   "/ads": (id) => listAds(id),
+  "/болеет": markSick,
+  "/sick": markSick,
+  "/вышел": markBack,
+  "/back": markBack,
+  "/болеют": (id) => sickList(id),
   "/статистика": (id) => sendStats(id),
   "/stats": (id) => sendStats(id),
   "/админ": (id) => adminHelp(id),
@@ -35,6 +41,7 @@ const adminHelp = (chatId: number) =>
       "/меню (/setmenu) — отправить или исправить меню на день",
       "/дежурные (/duties) — список дежурных на месяц",
       "/замена (/sub) — замена или отмена пары",
+      "/болеет Фамилия (/sick) — преподаватель заболел, /вышел Фамилия (/back) — вышел, /болеют — список",
       "/объявление (/announce) — объявление",
       "/реклама (/ad) — запланировать рекламный пост, /ads — список",
       "/статистика (/stats) — пользователи и охват рекламы",
@@ -104,7 +111,7 @@ async function handleMessage(m: TgMessage) {
     clearSession(chatId);
     return ADMIN_COMMANDS[cmd](chatId, rest);
   }
-  if (cmd || Object.values(BUTTONS).includes(text)) {
+  if (cmd || Object.values(BUTTONS).includes(text) || ["📅 Сегодня", "➡️ Завтра", "🗓 Неделя"].includes(text)) {
     clearSession(chatId);
     if (text === BUTTONS.order || cmd === "/order") return startOrder(chatId, user);
     if (await studentCommand(chatId, text, user)) return;
@@ -115,7 +122,7 @@ async function handleMessage(m: TgMessage) {
   if (session?.kind === "order") return orderText(chatId, text, session);
   if (admin && session) {
     if (session.kind === "admin_menu") return handleMenuText(chatId, text);
-    if (session.kind === "admin_duty" && session.step === "list") return saveDutyList(chatId, String(session.data.month), text);
+    if (session.kind === "admin_duty" && session.step === "list") return saveDutyList(chatId, String(session.data.month), text, (session.data.dutyKind as "mik" | "mgu") || "mik");
     if (session.kind === "admin_sub") return subText(chatId, text, session);
     if (session.kind === "admin_ann" && session.step === "content") return annMessage(chatId, m, session);
     if (session.kind === "admin_ad") return adMessage(chatId, m, session);
@@ -138,6 +145,7 @@ async function handleCallback(q: TgCallback) {
 
   if (prefix === "reg") return registrationCallback(chatId, messageId, data);
   if (prefix === "set") return settingsCallback(chatId, messageId, data);
+  if (prefix === "sch") return scheduleCallback(chatId, messageId, data, user);
   if (prefix === "ord") return orderCallback(chatId, messageId, data, getUser(chatId) ?? user, getSession(chatId));
   if (prefix === "adc") return adClick(chatId, Number(data.split(":")[1]));
   if (prefix === "noop") return;

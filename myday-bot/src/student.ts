@@ -7,9 +7,7 @@ import { btn, edit, grid, kb, send } from "./telegram";
 import { addDays, localNow } from "./time";
 
 export const BUTTONS = {
-  today: "📅 Сегодня",
-  tomorrow: "➡️ Завтра",
-  week: "🗓 Неделя",
+  schedule: "📅 Расписание",
   menu: "🍽 Меню",
   duty: "🎖 Дежурный",
   order: "📝 Заказать конспект",
@@ -19,14 +17,42 @@ export const BUTTONS = {
 
 export const mainKeyboard = {
   keyboard: [
-    [{ text: BUTTONS.today }, { text: BUTTONS.tomorrow }],
-    [{ text: BUTTONS.week }, { text: BUTTONS.menu }],
+    [{ text: BUTTONS.schedule }, { text: BUTTONS.menu }],
     [{ text: BUTTONS.duty }, { text: BUTTONS.order }],
     [{ text: BUTTONS.settings }, { text: BUTTONS.support }],
   ],
   resize_keyboard: true,
   is_persistent: true,
 };
+
+/** Старые кнопки клавиатуры (у кого она ещё не обновилась). */
+const LEGACY = { today: "📅 Сегодня", tomorrow: "➡️ Завтра", week: "🗓 Неделя" };
+
+type Tab = "today" | "tom" | "week";
+const TABS: [Tab, string][] = [
+  ["today", "Сегодня"],
+  ["tom", "Завтра"],
+  ["week", "Неделя"],
+];
+const scheduleTabs = (active: Tab) => kb([TABS.map(([k, t]) => btn(k === active ? `• ${t} •` : t, `sch:${k}`))]);
+
+function scheduleView(grp: string, tab: Tab) {
+  const today = localNow().date;
+  if (tab === "tom") return tomorrowText(grp, addDays(today, 1));
+  if (tab === "week") return weekText(grp, today);
+  return todayText(grp, today);
+}
+
+/** Вкладка «Расписание»: сразу показывает сегодня, кнопками — завтра и неделя. */
+export async function showSchedule(chatId: number, grp: string, tab: Tab = "today") {
+  await send(chatId, scheduleView(grp, tab), { reply_markup: scheduleTabs(tab) });
+}
+
+export async function scheduleCallback(chatId: number, messageId: number, data: string, user: User) {
+  const tab = data.split(":")[1] as Tab;
+  if (!user.grp || !TABS.some(([k]) => k === tab)) return;
+  await edit(chatId, messageId, scheduleView(user.grp, tab), scheduleTabs(tab));
+}
 
 const courseKeyboard = (prefix: string) => kb([[btn("1 курс", `${prefix}:1`), btn("2 курс", `${prefix}:2`)]]);
 
@@ -97,15 +123,20 @@ export async function studentCommand(chatId: number, text: string, user: User): 
   };
   const is = (button: string, ...cmds: string[]) => text === button || cmds.includes(cmd);
 
-  if (is(BUTTONS.today, "/today", "/сегодня")) {
+  const tab: Tab | null = is(BUTTONS.schedule, "/schedule", "/расписание") || is(LEGACY.today, "/today", "/сегодня")
+    ? "today"
+    : is(LEGACY.tomorrow, "/tomorrow", "/завтра")
+      ? "tom"
+      : is(LEGACY.week, "/week", "/неделя")
+        ? "week"
+        : null;
+  if (tab) {
     if (!user.grp) await needGroup();
-    else await send(chatId, todayText(user.grp, now.date), { reply_markup: mainKeyboard });
-  } else if (is(BUTTONS.tomorrow, "/tomorrow", "/завтра")) {
-    if (!user.grp) await needGroup();
-    else await send(chatId, tomorrowText(user.grp, addDays(now.date, 1)), { reply_markup: mainKeyboard });
-  } else if (is(BUTTONS.week, "/week", "/неделя")) {
-    if (!user.grp) await needGroup();
-    else await send(chatId, weekText(user.grp, now.date), { reply_markup: mainKeyboard });
+    else {
+      // старые кнопки — заодно обновим клавиатуру
+      if (Object.values(LEGACY).includes(text)) await send(chatId, "Обновил кнопки внизу 👇", { reply_markup: mainKeyboard });
+      await showSchedule(chatId, user.grp, tab);
+    }
   } else if (is(BUTTONS.menu, "/menu", "/меню")) {
     await send(chatId, menuText(now.date), { reply_markup: mainKeyboard });
   } else if (is(BUTTONS.duty, "/duty", "/дежурный")) {
@@ -120,7 +151,7 @@ export async function studentCommand(chatId: number, text: string, user: User): 
   } else if (cmd === "/help") {
     await send(
       chatId,
-      "Команды:\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурный\n/order — заказать конспект\n/settings — группа и уведомления\n/support — поддержка",
+      "Команды:\n/schedule — расписание (сегодня, завтра, неделя)\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурные по МИК и МГУ\n/order — заказать конспект\n/settings — группа и уведомления\n/support — поддержка",
       { reply_markup: mainKeyboard },
     );
   } else return false;
