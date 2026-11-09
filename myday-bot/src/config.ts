@@ -22,6 +22,10 @@ export const config = {
   get upperWeekStart() {
     return process.env.UPPER_WEEK_START || "2026-11-09";
   },
+  /** Поддержка (username без @). */
+  get supportContact() {
+    return (process.env.SUPPORT_CONTACT || "sanekhelper").replace(/^@/, "");
+  },
   /** Куда отправлять заказ конспекта (username без @). */
   get orderContact() {
     return (process.env.ORDER_CONTACT || "sanekhelper").replace(/^@/, "");

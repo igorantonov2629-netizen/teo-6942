@@ -1,3 +1,4 @@
+import { config } from "./config";
 import { clearSession, ensureUser, getUser, setNotify, setUserGroup, type User } from "./db";
 import { dutyText, menuText, todayText, tomorrowText, weekText } from "./messages";
 import { COURSES } from "./schedule-data";
@@ -13,6 +14,7 @@ export const BUTTONS = {
   duty: "🎖 Дежурный",
   order: "📝 Заказать конспект",
   settings: "⚙️ Настройки",
+  support: "🆘 Поддержка",
 };
 
 export const mainKeyboard = {
@@ -20,7 +22,7 @@ export const mainKeyboard = {
     [{ text: BUTTONS.today }, { text: BUTTONS.tomorrow }],
     [{ text: BUTTONS.week }, { text: BUTTONS.menu }],
     [{ text: BUTTONS.duty }, { text: BUTTONS.order }],
-    [{ text: BUTTONS.settings }],
+    [{ text: BUTTONS.settings }, { text: BUTTONS.support }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -110,10 +112,15 @@ export async function studentCommand(chatId: number, text: string, user: User): 
     await send(chatId, dutyText(now.date), { reply_markup: mainKeyboard });
   } else if (is(BUTTONS.settings, "/settings", "/настройки")) {
     await showSettings(chatId);
+  } else if (is(BUTTONS.support, "/support", "/поддержка")) {
+    const c = config.supportContact;
+    await send(chatId, `🆘 <b>Поддержка</b>\nЕсть вопрос, нашёл ошибку в расписании или бот работает не так? Пиши @${c} — поможем.`, {
+      reply_markup: kb([[{ text: `✉️ Написать @${c}`, url: `https://t.me/${c}` }]]),
+    });
   } else if (cmd === "/help") {
     await send(
       chatId,
-      "Команды:\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурный\n/order — заказать конспект\n/settings — группа и уведомления",
+      "Команды:\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурный\n/order — заказать конспект\n/settings — группа и уведомления\n/support — поддержка",
       { reply_markup: mainKeyboard },
     );
   } else return false;

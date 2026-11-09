@@ -179,6 +179,17 @@ describe("заказ конспекта", () => {
   });
 });
 
+describe("поддержка", () => {
+  test("кнопка «Поддержка» даёт ссылку на @sanekhelper", async () => {
+    await register(80, "501.11");
+    calls = [];
+    await msg(80, "🆘 Поддержка");
+    const c = sent(80)[0];
+    expect(textOf(c)).toContain("@sanekhelper");
+    expect(c.params.reply_markup.inline_keyboard[0][0].url).toBe("https://t.me/sanekhelper");
+  });
+});
+
 describe("рассылки по расписанию", () => {
   test("утро, напоминание о паре и вечер; без дублей", async () => {
     await register(30, "501.21");

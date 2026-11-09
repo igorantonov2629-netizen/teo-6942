@@ -23,6 +23,7 @@ const STUDENT_COMMANDS = [
   { command: "duty", description: "Дежурный сегодня" },
   { command: "order", description: "Заказать конспект" },
   { command: "settings", description: "Группа и уведомления" },
+  { command: "support", description: "Поддержка" },
 ];
 const ADMIN_COMMANDS = [
   { command: "setmenu", description: "Отправить меню (/меню)" },
