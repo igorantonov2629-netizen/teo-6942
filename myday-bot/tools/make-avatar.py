@@ -126,11 +126,8 @@ bg=Image.alpha_composite(bg,st)
 
 # ---------- эмблема ----------
 ER=336
-e=src.crop((CX-R,CY-R,CX+R,CY+R)).resize((2*ER,2*ER),Image.LANCZOS)
-e=ImageEnhance.Contrast(e).enhance(1.18); e=ImageEnhance.Color(e).enhance(1.15)
-e=e.filter(ImageFilter.UnsharpMask(radius=2,percent=80,threshold=2))
-em=Image.new("L",e.size,0); ImageDraw.Draw(em).ellipse((4,4,2*ER-4,2*ER-4),fill=255)
-em=em.filter(ImageFilter.GaussianBlur(1.5))
+ev=Image.open(f"{D}/emblem_vec.png").resize((2*ER,2*ER),Image.LANCZOS)
+e=ev.convert("RGB"); em=ev.split()[3]
 
 # тень
 sh=Image.new("L",(S,S),0); ImageDraw.Draw(sh).ellipse((C-ER-6,EY-ER+22,C+ER+6,EY+ER+34),fill=170)
@@ -153,7 +150,7 @@ bg=Image.alpha_composite(bg,lay)
 bg=gold_ring(bg,ER+2,6)
 bg.paste(e,(C-ER,EY-ER),em)
 # блик сверху на эмблеме
-hl=Image.new("L",(S,S),0); ImageDraw.Draw(hl).ellipse((C-ER*0.8,EY-ER*0.98,C+ER*0.8,EY-ER*0.15),fill=38)
+hl=Image.new("L",(S,S),0); ImageDraw.Draw(hl).ellipse((C-ER*0.8,EY-ER*0.98,C+ER*0.8,EY-ER*0.15),fill=22)
 mask_e=Image.new("L",(S,S),0); mask_e.paste(em,(C-ER,EY-ER))
 hl=ImageChops.multiply(hl.filter(ImageFilter.GaussianBlur(30)),mask_e)
 bg=Image.composite(Image.new("RGBA",(S,S),(255,255,255,255)),bg,hl)
