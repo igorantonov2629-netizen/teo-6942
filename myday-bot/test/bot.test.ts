@@ -149,6 +149,7 @@ describe("дежурные", () => {
     seedDuties();
     expect(missingDutyDays("2026-11")).toEqual([]);
     expect(missingDutyDays("2026-12")).toHaveLength(31);
+    expect(missingDutyDays("2026-11", "mgu")).toEqual([]);
   });
 });
 

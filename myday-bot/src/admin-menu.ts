@@ -193,9 +193,15 @@ export const upcomingMissingDuties = (from: string, days = 3) =>
 const NOVEMBER_2026 =
   "Борт,Ельцов,Семенко,Глушко,Борт,Онучин,Ельцов,Семенко,Чинфуло,Шаршеев,Глушко,Борт,Ельцов,Шаршеев,Онучин,Глушко,Семенко,Шаршеев,Онучин,Глушко,Борт,Ельцов,Семенко,Онучин,Борт,Ельцов,Семенко,Онучин,Глушко,Чинфуло".split(",");
 
+/** Столбец «Деж. по МГУ» из графика нарядов на ноябрь 2026. */
+const NOVEMBER_2026_MGU =
+  "Грудин,Кайлюнен,Кравцов,Бобров,Евсеенко,Гладченко,Филатов,Бобров,Кравцов,Евсеенко,Гладченко,Грудин,Шубравский,Кравцов,Евсеенко,Бобров,Гладченко,Грудин,Филатов,Евсеенко,Бобров,Шубравский,Кравцов,Грудин,Шубравский,Евсеенко,Бобров,Грудин,Кравцов,Шубравский".split(",");
+
 export function seedDuties() {
-  const has = getDb().query<{ n: number }, [string]>("SELECT COUNT(*) AS n FROM duties WHERE date LIKE ?").get("2026-11-%")!.n;
-  if (!has) saveDuties(NOVEMBER_2026.map((name, i) => ({ date: `2026-11-${String(i + 1).padStart(2, "0")}`, name })));
+  const count = (table: string) => getDb().query<{ n: number }, [string]>(`SELECT COUNT(*) AS n FROM ${table} WHERE date LIKE ?`).get("2026-11-%")!.n;
+  const dated = (names: string[]) => names.map((name, i) => ({ date: `2026-11-${String(i + 1).padStart(2, "0")}`, name }));
+  if (!count("duties")) saveDuties(dated(NOVEMBER_2026));
+  if (!count("duties_mgu")) saveDuties(dated(NOVEMBER_2026_MGU), "mgu");
 }
 
 export const menuMissingText = (date: string) => `⚠️ Меню на сегодня (${ruDate(date)}) не отправлено. Отправь его командой /меню.`;
