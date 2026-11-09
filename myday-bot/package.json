@@ -1,0 +1,15 @@
+{
+  "name": "myday-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun --env-file=.env src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "check-privacy": "bun --env-file=.env tools/check-privacy.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.14",
+    "typescript": "5.9.3"
+  }
+}
