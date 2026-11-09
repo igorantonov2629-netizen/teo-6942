@@ -171,7 +171,7 @@ export const TIMETABLE: Record<string, string[][]> = {
   ],
   "501.22": [
     ["OSV", "TUS", "OBP", "ETE"],
-    ["TUS", "TMP", "IY", "ETE/X"],
+    ["ETE", "TMP", "IY", "X"], // вторник изменён с 10.11.2026
     ["NAV", "TUS", "VM/TG", "ETE"],
     ["FZK", "TUS", "OSV", "X/TMP"],
     ["NAV", "VM", "TMP", "X"],
