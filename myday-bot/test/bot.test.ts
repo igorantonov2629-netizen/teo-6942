@@ -114,6 +114,8 @@ describe("меню", () => {
     expect(r.menu.lunch).toBe("Борщ с курицей и сметаной\nМандарин\nПлюшка сдобная с сахаром");
     expect(r.menu.dinner).toBe("Салат «Провансаль, оливье»");
     expect(r.menu.lunch).not.toContain("Полдник");
+    const r2 = parseMenu("Ужин\nХлеб\nУжин 2\nКисломолочный продукт 2,5% 1/200")!;
+    expect(r2.menu.dinner).toBe("Хлеб\nКисломолочный продукт 2,5%");
   });
   test("позднее меню рассылается только с оставшимися приёмами пищи", async () => {
     await register(10, "501.21");

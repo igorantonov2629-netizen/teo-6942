@@ -11,10 +11,13 @@ export function splitDishes(text: string): string[] {
   const out: string[] = [];
   let depth = 0;
   let cur = "";
-  for (const ch of text) {
+  const chars = [...text];
+  for (let i = 0; i < chars.length; i++) {
+    const ch = chars[i];
     if ("(«".includes(ch)) depth++;
     if (")»".includes(ch)) depth = Math.max(0, depth - 1);
-    if ((ch === "," || ch === ";") && depth === 0) {
+    const decimal = ch === "," && /\d/.test(chars[i - 1] ?? "") && /\d/.test(chars[i + 1] ?? ""); // «2,5%»
+    if ((ch === "," || ch === ";") && depth === 0 && !decimal) {
       out.push(cur);
       cur = "";
     } else cur += ch;
@@ -35,11 +38,12 @@ export function cleanDish(s: string) {
 
 const MEAL_HEAD = /^(завтрак|обед|ужин)(?=\s*([:\-—–]|$))\s*[:\-—–]?\s*(.*)$/i;
 const BREAKFAST2 = /^(завтрак\s*2|второй\s+завтрак)\s*(\([^)]*\))?\s*[:\-—–]?\s*(.*)$/i;
+const DINNER2 = /^(ужин\s*2|второй\s+ужин)\s*(\([^)]*\))?\s*[:\-—–]?\s*(.*)$/i;
 const SNACK = /^полдник\s*(\([^)]*\))?\s*[:\-—–]?\s*(.*)$/i;
 
 /**
  * «Завтрак: …\nОбед: …\nУжин: …» — блюда через запятую или каждое с новой строки.
- * «Завтрак 2 (…)» идёт подзаголовком в завтрак, блюда полдника — просто в обед.
+ * «Завтрак 2 (…)» — подзаголовок в завтраке; блюда второго ужина — в ужин, блюда полдника — просто в обед.
  * Первая строка «завтра» — меню на завтра. Блюда хранятся построчно; строка с «:» в конце — подзаголовок.
  */
 export function parseMenu(text: string): { menu: Menu; tomorrow: boolean } | null {
@@ -58,6 +62,9 @@ export function parseMenu(text: string): { menu: Menu; tomorrow: boolean } | nul
       last = "breakfast";
       items.breakfast.push(`Завтрак 2${m[2] ? ` ${m[2]}` : ""}:`);
       items.breakfast.push(...splitDishes(m[3]));
+    } else if ((m = line.match(DINNER2))) {
+      last = "dinner"; // второй ужин — просто в общий список ужина
+      items.dinner.push(...splitDishes(m[3]));
     } else if ((m = line.match(SNACK))) {
       last = "lunch";
       items.lunch.push(...splitDishes(m[2]));
