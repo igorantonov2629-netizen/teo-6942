@@ -32,7 +32,8 @@ bg=Image.composite(Image.new("RGBA",(S,S),(150,190,245,255)),bg,cr)
 
 # лучи от эмблемы
 rays=Image.new("L",(S,S),0); d=ImageDraw.Draw(rays)
-EY=548
+EY=578
+ER=336
 for i in range(24):
     a1=math.radians(i*15); a2=a1+math.radians(5)
     d.polygon([(C,EY),(C+900*math.cos(a1),EY+900*math.sin(a1)),(C+900*math.cos(a2),EY+900*math.sin(a2))],fill=28)
@@ -47,8 +48,84 @@ bg=Image.composite(Image.new("RGBA",(S,S),(255,214,130,255)),bg,glow.filter(Imag
 random.seed(7); noise=Image.effect_noise((S,S),18).point(lambda v:v-128 if v>128 else 0)
 bg=Image.composite(Image.new("RGBA",(S,S),(255,255,255,255)),bg,noise.point(lambda v:int(v*0.25)))
 
+
+# ---------- море внизу ----------
+def wave_layer(img,base,amp,period,phase,top,bot,foam):
+    poly=[(0,S)]
+    for x in range(0,S+8,8):
+        poly.append((x,base+amp*math.sin(2*math.pi*x/period+phase)+amp*0.35*math.sin(2*math.pi*x/(period*0.45)+phase*1.7)))
+    poly.append((S,S))
+    m=Image.new("L",(S,S),0); ImageDraw.Draw(m).polygon(poly,fill=255)
+    g=Image.new("RGBA",(S,S)); gp=g.load()
+    for y in range(S):
+        t=min(1,max(0,(y-base+amp)/(S-base+amp)))
+        c=lerp(top,bot,t)
+        for x in range(S): gp[x,y]=c+(255,)
+    img=Image.composite(g,img,m)
+    dd=ImageDraw.Draw(img)
+    dd.line(poly[1:-1],fill=foam,width=5,joint="curve")
+    return img
+bg=wave_layer(bg,1085,22,420,0.3,(40,86,160),(12,32,80),(170,205,245,255))
+bg=wave_layer(bg,1140,18,330,2.1,(28,66,138),(8,22,60),(140,180,235,255))
+bg=wave_layer(bg,1195,15,270,4.0,(18,48,112),(5,14,42),(110,155,220,255))
+
+# ---------- лавровые ветви ----------
+def leaf(dd,x,y,ang,L,W,fill,outline):
+    pts=[]
+    for i in range(21):
+        t=i/20; px_=-L/2+L*t; py_=W/2*math.sin(math.pi*t)**0.8
+        pts.append((px_,py_))
+    pts+= [(p[0],-p[1]) for p in reversed(pts)]
+    ca,sa=math.cos(ang),math.sin(ang)
+    dd.polygon([(x+p[0]*ca-p[1]*sa,y+p[0]*sa+p[1]*ca) for p in pts],fill=fill,outline=outline)
+lv=Image.new("RGBA",(S,S),(0,0,0,0)); ld=ImageDraw.Draw(lv)
+LR=ER+78
+for sgn in (-1,1):
+    a0,a1=(116,228) if sgn<0 else (64,-48)
+    n=11
+    stem=[]
+    for i in range(n+1):
+        a=math.radians(a0+(a1-a0)*i/n); stem.append((C+LR*math.cos(a),EY+LR*math.sin(a)))
+    ld.line(stem,fill=GOLD_D+(255,),width=9,joint="curve")
+    for i in range(1,n+1):
+        a=math.radians(a0+(a1-a0)*i/n); x=C+LR*math.cos(a); y=EY+LR*math.sin(a)
+        tang=a+(math.pi/2 if sgn<0 else -math.pi/2)
+        size=1-0.35*i/n
+        for side in (-1,1):
+            ang=tang+side*0.55*(-sgn)
+            ox=math.cos(ang)*30*size; oy=math.sin(ang)*30*size
+            col=GOLD if side>0 else lerp(GOLD,GOLD_L,0.45)
+            leaf(ld,x+ox,y+oy,ang,66*size,24*size,col+(255,),GOLD_D+(255,))
+    # ягоды
+    for i in (3,6,9):
+        a=math.radians(a0+(a1-a0)*(i-0.5)/n); x=C+(LR-26)*math.cos(a); y=EY+(LR-26)*math.sin(a)
+        ld.ellipse((x-8,y-8,x+8,y+8),fill=GOLD_L+(255,),outline=GOLD_D+(255,))
+shl=lv.split()[3].filter(ImageFilter.GaussianBlur(8))
+bg=Image.composite(Image.new("RGBA",(S,S),(0,0,0,255)),bg,ImageChops.offset(shl,0,8).point(lambda v:int(v*0.55)))
+bg=Image.alpha_composite(bg,lv)
+
+# ---------- звезда сверху ----------
+def star(dd,x,y,r,fill,outline):
+    pts=[]
+    for k in range(10):
+        a=math.radians(-90+k*36); rr=r if k%2==0 else r*0.42
+        pts.append((x+rr*math.cos(a),y+rr*math.sin(a)))
+    dd.polygon(pts,fill=fill,outline=outline)
+st=Image.new("RGBA",(S,S),(0,0,0,0)); sdr=ImageDraw.Draw(st)
+SY=EY-ER-98
+glw=Image.new("L",(S,S),0); ImageDraw.Draw(glw).ellipse((C-90,SY-90,C+90,SY+90),fill=150)
+bg=Image.composite(Image.new("RGBA",(S,S),GOLD_L+(255,)),bg,glw.filter(ImageFilter.GaussianBlur(30)))
+star(sdr,C,SY,58,GOLD_D+(255,),None); star(sdr,C,SY-2,52,GOLD+(255,),None)
+# светлая половина граней
+for k in range(5):
+    a=math.radians(-90+k*72); b=math.radians(-90+k*72+36)
+    sdr.polygon([(C,SY-2),(C+52*math.cos(a),SY-2+52*math.sin(a)),(C+52*0.42*math.cos(b),SY-2+52*0.42*math.sin(b))],fill=GOLD_L+(255,))
+for sgn in (-1,1):
+    star(sdr,C+sgn*92,SY+26,24,GOLD_D+(255,),None); star(sdr,C+sgn*92,SY+25,21,GOLD+(255,),None)
+bg=Image.alpha_composite(bg,st)
+
 # ---------- эмблема ----------
-ER=372
+ER=336
 e=src.crop((CX-R,CY-R,CX+R,CY+R)).resize((2*ER,2*ER),Image.LANCZOS)
 e=ImageEnhance.Contrast(e).enhance(1.18); e=ImageEnhance.Color(e).enhance(1.15)
 e=e.filter(ImageFilter.UnsharpMask(radius=2,percent=80,threshold=2))
@@ -135,7 +212,7 @@ bg=Image.composite(tg,bg,tm)
 
 # искры
 sp=Image.new("RGBA",(S,S),(0,0,0,0)); sd=ImageDraw.Draw(sp)
-for (x,y,s) in ((C-430,250,30),(C+440,290,22),(C+370,170,14),(C-350,150,12),(C-500,560,14),(C+505,620,18)):
+for (x,y,s) in ((C+440,250,26),(C-470,420,16),(C+250,120,12),(C-230,130,12)):
     sd.polygon([(x,y-s),(x+s*0.22,y-s*0.22),(x+s,y),(x+s*0.22,y+s*0.22),(x,y+s),(x-s*0.22,y+s*0.22),(x-s,y),(x-s*0.22,y-s*0.22)],fill=GOLD_L+(230,))
 bg=Image.alpha_composite(bg,sp.filter(ImageFilter.GaussianBlur(0.8)))
 
