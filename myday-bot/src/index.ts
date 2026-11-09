@@ -36,10 +36,16 @@ const ADMIN_COMMANDS = [
   { command: "cancel", description: "Прервать диалог" },
 ];
 
+const DESCRIPTION =
+  "Вся информация жизни МИК!\nПриемы пищи, расписание, заказать конспекты - все, что тебе нужно уже здесь, в удобном интерфейсе!\n\nПоддержка - @sanekhelper";
+const SHORT_DESCRIPTION = "Вся информация жизни МИК! Поддержка - @sanekhelper";
+
 async function setup() {
   // Бот работает через long polling: никакого входящего HTTP-порта наружу.
   await tg("deleteWebhook", { drop_pending_updates: false });
   await tg("setMyCommands", { commands: STUDENT_COMMANDS });
+  await tg("setMyDescription", { description: DESCRIPTION }).catch(() => null);
+  await tg("setMyShortDescription", { short_description: SHORT_DESCRIPTION }).catch(() => null);
   for (const id of config.adminIds)
     await tg("setMyCommands", { commands: [...STUDENT_COMMANDS, ...ADMIN_COMMANDS], scope: { type: "chat", chat_id: id } }).catch(() => null);
   const me = await tg<{ username: string }>("getMe");
