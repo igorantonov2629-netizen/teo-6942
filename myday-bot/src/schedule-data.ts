@@ -165,7 +165,7 @@ export const TIMETABLE: Record<string, string[][]> = {
   "501.21": [
     ["TUS", "OSV", "ETE", "X"],
     ["TMP", "TUS", "NAV", "X/ETE"],
-    ["TUS", "OSV", "TG/VM", "TMP/X"],
+    ["TMP", "OSV", "TG/VM", "TMP/X"], // среда: 1 пара — Полисадина вместо Коробейко (с 12.11.2026)
     ["NAV", "IK", "TUS", "VM"],
     ["OBP", "TUS", "FZK", "TMP"],
     ["IST", "OSV", "ETE"],
