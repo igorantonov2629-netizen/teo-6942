@@ -466,3 +466,59 @@ describe("барахолка", () => {
     expect(listings()[0].status).toBe("active");
   });
 });
+
+describe("обратный отсчёт", () => {
+  test("админ добавляет событие — оно в утреннем сообщении", async () => {
+    const { daysWord } = await import("../src/countdown");
+    expect([1, 2, 5, 11, 21, 22, 46].map(daysWord)).toEqual(["1 день", "2 дня", "5 дней", "11 дней", "21 день", "22 дня", "46 дней"]);
+    await msg(1, "/отсчёт 28.12.2026 До каникул");
+    await msg(77, "/отсчёт 01.01.2027 Взлом"); // не админ
+    const text = morningText("501.21", "2026-11-12");
+    expect(text).toContain("⏳ До каникул — 46 дней");
+    expect(text).not.toContain("Взлом");
+    expect(morningText("501.21", "2026-12-28")).toContain("🎉 До каникул — сегодня!");
+    expect(morningText("501.21", "2026-12-29")).not.toContain("каникул");
+  });
+});
+
+describe("преподаватели", () => {
+  test("поиск по фамилии, пары по группам, где сейчас", async () => {
+    const { searchTeachers, teacherText } = await import("../src/teachers");
+    expect(searchTeachers("малыш")).toEqual(["Малышев С.А."]);
+    expect(searchTeachers("Мазурик").length).toBe(2);
+    // вторник 10.11.2026, 9:30 — идёт 1 пара
+    const text = teacherText("Малышев С.А.", "today", { date: "2026-11-10", dow: 1, minutes: hm("9:30") });
+    expect(text).toContain("Малышев С.А.");
+    expect(text).toMatch(/пара/);
+    const week = teacherText("Малышев С.А.", "week", { date: "2026-11-10", dow: 1, minutes: hm("9:30") });
+    expect(week).toContain("Понедельник");
+    expect(week).toContain("501.");
+  });
+  test("кнопка → фамилия → карточка с вкладками", async () => {
+    await register(60, "501.21");
+    calls = [];
+    await msg(60, "👨‍🏫 Преподаватели");
+    await msg(60, "Малышев");
+    const card = sent(60).at(-1)!;
+    expect(textOf(card)).toContain("Малышев С.А.");
+    expect(JSON.stringify(card.params.reply_markup)).toContain("tch:");
+  });
+});
+
+describe("резервная копия", () => {
+  test("раз в день после 4:05 админу уходит сжатая копия базы, которая открывается", async () => {
+    const { Database } = await import("bun:sqlite");
+    await register(70, "501.21");
+    calls = [];
+    await tick({ date: "2026-11-12", dow: 3, minutes: hm("3:00") });
+    expect(calls.some((c) => c.method === "sendDocument")).toBe(false);
+    await tick({ date: "2026-11-12", dow: 3, minutes: hm("4:05") });
+    await tick({ date: "2026-11-12", dow: 3, minutes: hm("4:06") });
+    const docs = calls.filter((c) => c.method === "sendDocument");
+    expect(docs.length).toBe(1);
+    expect(docs[0].params.chat_id).toBe(1);
+    const file = docs[0].params.document as File;
+    const restored = Database.deserialize(Bun.gunzipSync(new Uint8Array(await file.arrayBuffer())));
+    expect(restored.query("SELECT grp FROM users WHERE chat_id = 70").get()).toEqual({ grp: "501.21" });
+  });
+});

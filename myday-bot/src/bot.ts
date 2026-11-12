@@ -6,6 +6,9 @@ import { startSub, subCallback, subText } from "./admin-sub";
 import { markBack, markSick, sickList } from "./admin-sick";
 import { esc } from "./messages";
 import { adminMarketList, marketCallback, marketMessage } from "./market";
+import { countdownCallback, countdownCommand } from "./countdown";
+import { sendBackup } from "./backup";
+import { teacherCallback, teacherQuery } from "./teachers";
 import { orderCallback, orderText, startOrder } from "./order";
 import { BUTTONS, mainKeyboard, registrationCallback, scheduleCallback, settingsCallback, startRegistration, studentCommand } from "./student";
 import { answer, edit, send } from "./telegram";
@@ -32,6 +35,11 @@ const ADMIN_COMMANDS: Record<string, (chatId: number, rest: string) => Promise<u
   "/stats": (id) => sendStats(id),
   "/барахолка": (id) => adminMarketList(id),
   "/mod": (id) => adminMarketList(id),
+  "/отсчёт": countdownCommand,
+  "/отсчет": countdownCommand,
+  "/countdown": countdownCommand,
+  "/бэкап": (id) => sendBackup([id]),
+  "/backup": (id) => sendBackup([id]),
   "/админ": (id) => adminHelp(id),
   "/admin": (id) => adminHelp(id),
 };
@@ -48,6 +56,8 @@ const adminHelp = (chatId: number) =>
       "/объявление (/announce) — объявление",
       "/реклама (/ad) — запланировать рекламный пост, /ads — список",
       "/барахолка (/mod) — объявления барахолки, удаление",
+      "/отсчёт (/countdown) — обратный отсчёт в утреннем сообщении",
+      "/бэкап (/backup) — прислать копию базы сейчас (автоматически — каждый день в 4:05)",
       "/статистика (/stats) — пользователи и охват рекламы",
       "/cancel — прервать текущий диалог",
     ].join("\n"),
@@ -124,6 +134,7 @@ async function handleMessage(m: TgMessage) {
 
   const session = getSession(chatId);
   if (session?.kind === "order") return orderText(chatId, text, session);
+  if (session?.kind === "teacher") return teacherQuery(chatId, text);
   if (session?.kind === "market") return marketMessage(chatId, m, session);
   if (admin && session) {
     if (session.kind === "admin_menu") return handleMenuText(chatId, text);
@@ -153,12 +164,14 @@ async function handleCallback(q: TgCallback) {
   if (prefix === "sch") return scheduleCallback(chatId, messageId, data, user);
   if (prefix === "ord") return orderCallback(chatId, messageId, data, getUser(chatId) ?? user, getSession(chatId));
   if (prefix === "mk") return marketCallback(chatId, messageId, data, q.from, getSession(chatId));
+  if (prefix === "tch") return teacherCallback(chatId, messageId, data);
   if (prefix === "adc") return adClick(chatId, Number(data.split(":")[1]));
   if (prefix === "noop") return;
 
   // Всё остальное — только для админа.
   if (!isAdmin(q.from.id)) return;
   const session = getSession(chatId);
+  if (prefix === "cd") return countdownCallback(chatId, messageId, data);
   if (prefix === "duty") return dutyCallback(chatId, messageId, data, session);
   if (prefix === "sub") return subCallback(chatId, messageId, data, session);
   if (prefix === "ann") return annCallback(chatId, messageId, data, session);

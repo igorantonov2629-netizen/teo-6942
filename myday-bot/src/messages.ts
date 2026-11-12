@@ -1,3 +1,4 @@
+import { countdownLines } from "./countdown";
 import { getDuty, getMenu, listAbsences, type Menu } from "./db";
 import { dayPairs, MEALS, mealTime, PAIRS, place, weekLabel, weekType, type DayPair, type Meal } from "./schedule";
 import type { Lesson } from "./schedule-data";
@@ -95,7 +96,16 @@ export function morningText(grp: string, date: string) {
   const dow = dowOf(date);
   const menu = getMenu(date);
   const { text } = dayBlock(grp, date);
-  return [`☀️ <b>Доброе утро! ${ruDayDate(date)}</b>`, text, "", mealLine("breakfast", menu, dow), "", dutyLine(date)].join("\n");
+  const countdown = countdownLines(date);
+  return [
+    `☀️ <b>Доброе утро! ${ruDayDate(date)}</b>`,
+    text,
+    "",
+    mealLine("breakfast", menu, dow),
+    "",
+    dutyLine(date),
+    ...(countdown.length ? ["", ...countdown] : []),
+  ].join("\n");
 }
 
 /** Кнопка «Сегодня». */

@@ -22,11 +22,17 @@ export const redact = (s: string) => (config.token ? s.split(config.token).join(
 const httpTransport: Transport = async (method, params) => {
   let res: Response;
   try {
-    res = await fetch(`https://api.telegram.org/bot${config.token}/${method}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
-    });
+    // Файлы (Blob) отправляются multipart-формой, всё остальное — JSON.
+    const hasFile = Object.values(params).some((v) => v instanceof Blob);
+    let init: RequestInit;
+    if (hasFile) {
+      const form = new FormData();
+      for (const [k, v] of Object.entries(params))
+        if (v instanceof Blob) form.append(k, v, (v as File).name ?? "file");
+        else if (v !== undefined) form.append(k, typeof v === "object" ? JSON.stringify(v) : String(v));
+      init = { method: "POST", body: form };
+    } else init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) };
+    res = await fetch(`https://api.telegram.org/bot${config.token}/${method}`, init);
   } catch (e) {
     throw new Error(redact(`Сеть: ${(e as Error).message}`));
   }
