@@ -23,6 +23,7 @@ const STUDENT_COMMANDS = [
   { command: "menu", description: "Меню столовой" },
   { command: "duty", description: "Дежурные по МИК и МГУ" },
   { command: "order", description: "Заказать конспект" },
+  { command: "market", description: "Барахолка" },
   { command: "settings", description: "Группа и уведомления" },
   { command: "support", description: "Поддержка" },
 ];
@@ -33,6 +34,7 @@ const ADMIN_COMMANDS = [
   { command: "announce", description: "Объявление (/объявление)" },
   { command: "ad", description: "Реклама (/реклама)" },
   { command: "ads", description: "Список рекламы" },
+  { command: "mod", description: "Барахолка: модерация (/барахолка)" },
   { command: "stats", description: "Статистика (/статистика)" },
   { command: "cancel", description: "Прервать диалог" },
 ];

@@ -1,6 +1,7 @@
 import { config } from "./config";
 import { clearSession, ensureUser, getUser, setNotify, setUserGroup, type User } from "./db";
 import { dutyText, menuText, todayText, tomorrowText, weekText } from "./messages";
+import { showMarket } from "./market";
 import { COURSES } from "./schedule-data";
 import { courseOf } from "./schedule";
 import { btn, edit, grid, kb, send } from "./telegram";
@@ -13,13 +14,15 @@ export const BUTTONS = {
   order: "📝 Заказать конспект",
   settings: "⚙️ Настройки",
   support: "🆘 Поддержка",
+  market: "🛒 Барахолка",
 };
 
 export const mainKeyboard = {
   keyboard: [
     [{ text: BUTTONS.schedule }, { text: BUTTONS.menu }],
-    [{ text: BUTTONS.duty }, { text: BUTTONS.order }],
-    [{ text: BUTTONS.settings }, { text: BUTTONS.support }],
+    [{ text: BUTTONS.duty }, { text: BUTTONS.market }],
+    [{ text: BUTTONS.order }, { text: BUTTONS.settings }],
+    [{ text: BUTTONS.support }],
   ],
   resize_keyboard: true,
   is_persistent: true,
@@ -141,6 +144,8 @@ export async function studentCommand(chatId: number, text: string, user: User): 
     await send(chatId, menuText(now.date), { reply_markup: mainKeyboard });
   } else if (is(BUTTONS.duty, "/duty", "/дежурный")) {
     await send(chatId, dutyText(now.date), { reply_markup: mainKeyboard });
+  } else if (is(BUTTONS.market, "/market", "/барахолка")) {
+    await showMarket(chatId);
   } else if (is(BUTTONS.settings, "/settings", "/настройки")) {
     await showSettings(chatId);
   } else if (is(BUTTONS.support, "/support", "/поддержка")) {
@@ -151,7 +156,7 @@ export async function studentCommand(chatId: number, text: string, user: User): 
   } else if (cmd === "/help") {
     await send(
       chatId,
-      "Команды:\n/schedule — расписание (сегодня, завтра, неделя)\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурные по МИК и МГУ\n/order — заказать конспект\n/settings — группа и уведомления\n/support — поддержка",
+      "Команды:\n/schedule — расписание (сегодня, завтра, неделя)\n/today — пары на сегодня\n/tomorrow — на завтра\n/week — на неделю\n/menu — меню столовой\n/duty — дежурные по МИК и МГУ\n/order — заказать конспект\n/market — барахолка\n/settings — группа и уведомления\n/support — поддержка",
       { reply_markup: mainKeyboard },
     );
   } else return false;

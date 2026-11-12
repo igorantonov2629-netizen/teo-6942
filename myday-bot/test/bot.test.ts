@@ -371,3 +371,98 @@ describe("приватность", () => {
     expect(getUser(70)).toBeNull();
   });
 });
+
+describe("барахолка", () => {
+  const cbu = (from: number, data: string, username?: string) =>
+    handleUpdate({ update_id: upd++, callback_query: { id: String(upd), from: { id: from, username }, data, message: { message_id: 5, chat: { id: from, type: "private" } } } });
+  const photo = (from: number) =>
+    handleUpdate({ update_id: upd++, message: { message_id: upd, from: { id: from }, chat: { id: from, type: "private" }, photo: [{ file_id: "PH", width: 1, height: 1 }] } });
+  async function post(chatId: number, username = "seller", title = "Китель 48") {
+    await cbu(chatId, "mk:new", username);
+    await photo(chatId);
+    await msg(chatId, title);
+    await msg(chatId, "1500 ₽");
+    await msg(chatId, "Почти новый, <b>забрать</b> в общаге");
+    await cbu(chatId, "mk:cat:form", username);
+    await cbu(chatId, "mk:pub", username);
+  }
+  const listings = () => getDb().query<any, []>("SELECT * FROM listings").all();
+
+  test("кнопка в меню, размещение, админ получает копию с кнопками", async () => {
+    await register(50, "501.21");
+    calls = [];
+    await msg(50, "🛒 Барахолка");
+    expect(textOf(sent(50)[0])).toContain("Барахолка");
+    await post(50);
+    const [l] = listings();
+    expect(l).toMatchObject({ chat_id: 50, username: "seller", title: "Китель 48", price: "1500 ₽", category: "form", photo: "PH", status: "active" });
+    const toAdmin = sent(1).at(-1)!;
+    expect(toAdmin.method).toBe("sendPhoto");
+    expect(textOf(toAdmin)).toContain("&lt;b&gt;забрать"); // пользовательский HTML экранируется
+    expect(JSON.stringify(toAdmin.params.reply_markup)).toContain(`mk:del:${l.id}`);
+  });
+
+  test("без username разместить нельзя", async () => {
+    await cbu(51, "mk:new");
+    expect(calls.some((c) => String(c.params.text).includes("username"))).toBe(true);
+    expect(getDb().query("SELECT * FROM sessions WHERE chat_id = 51").get()).toBeNull();
+  });
+
+  test("покупатель видит карточку с кнопкой в личку продавца, может пожаловаться", async () => {
+    await post(52, "vasya");
+    calls = [];
+    await cbu(53, "mk:b:all:0");
+    const card = sent(53).at(-1)!;
+    expect(JSON.stringify(card.params.reply_markup)).toContain("https://t.me/vasya");
+    expect(JSON.stringify(card.params.reply_markup)).not.toContain("mk:del"); // не админ
+    const id = listings()[0].id;
+    await cbu(53, `mk:rep:${id}`);
+    await cbu(53, `mk:rep:${id}`);
+    expect(sent(1).filter((c) => textOf(c).includes("Жалоба")).length).toBe(1); // повторная жалоба не дублируется
+  });
+
+  test("лимит 3 объявления и пауза 10 минут", async () => {
+    await post(54, "a", "Раз");
+    await post(54, "a", "Два");
+    expect(listings().length).toBe(1); // пауза
+    getDb().query("UPDATE listings SET created_at = created_at - 3600000").run();
+    await post(54, "a", "Два");
+    getDb().query("UPDATE listings SET created_at = created_at - 3600000").run();
+    await post(54, "a", "Три");
+    getDb().query("UPDATE listings SET created_at = created_at - 3600000").run();
+    await post(54, "a", "Четыре");
+    expect(listings().length).toBe(3);
+  });
+
+  test("продавец закрывает сам; админ удаляет и банит", async () => {
+    await post(55, "p");
+    const id = listings()[0].id;
+    await cbu(56, `mk:sold:${id}`); // чужое — нельзя
+    expect(listings()[0].status).toBe("active");
+    await cbu(57, `mk:del:${id}`); // не админ
+    expect(listings()[0].status).toBe("active");
+    await cbu(1, `mk:ban:${id}`);
+    expect(listings()[0].status).toBe("removed");
+    calls = [];
+    await cbu(55, "mk:new", "p");
+    expect(calls.some((c) => String(c.params.text).includes("не можешь"))).toBe(true);
+  });
+
+  test("истечение срока и напоминание о продлении", async () => {
+    const { marketTick } = await import("../src/market");
+    await post(58, "q");
+    const id = listings()[0].id;
+    getDb().query("UPDATE listings SET expires_at = ? WHERE id = ?").run(Date.now() + 3600000, id);
+    calls = [];
+    await marketTick(hm("3:00")); // ночью не пишем
+    expect(sent(58).length).toBe(0);
+    await marketTick(hm("12:00"));
+    await marketTick(hm("12:01"));
+    expect(sent(58).filter((c) => textOf(c).includes("будет снято")).length).toBe(1);
+    getDb().query("UPDATE listings SET expires_at = ? WHERE id = ?").run(Date.now() - 1, id);
+    await marketTick(hm("12:02"));
+    expect(listings()[0].status).toBe("expired");
+    await cbu(58, `mk:renew:${id}`, "q");
+    expect(listings()[0].status).toBe("active");
+  });
+});

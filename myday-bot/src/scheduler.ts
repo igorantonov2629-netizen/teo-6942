@@ -2,6 +2,7 @@ import { config } from "./config";
 import { audienceChatIds, claimJob, getDb, getMenu, purgeOldJobs, purgeOldSessions, type Audience } from "./db";
 import { adMarkup, adPost, AD_FROM, AD_TO, sendPost, stopAd, type Ad } from "./admin-post";
 import { dutyMissingText, menuMissingText, morningAt, upcomingMissingDuties } from "./admin-menu";
+import { marketTick, purgeOldListings } from "./market";
 import { mealReminderText, morningText, pairReminderText, tomorrowText } from "./messages";
 import { dayPairs, mealTime, PAIRS, type Meal } from "./schedule";
 import { broadcast, send } from "./telegram";
@@ -110,9 +111,11 @@ export async function tick(now: LocalNow = localNow()) {
     }
   }
   await runAds(now).catch((e) => console.error("Реклама:", (e as Error).message));
+  await marketTick(now.minutes).catch((e) => console.error("Барахолка:", (e as Error).message));
   if (now.minutes === hm("4:00")) {
     purgeOldSessions();
     purgeOldJobs();
+    purgeOldListings();
   }
 }
 

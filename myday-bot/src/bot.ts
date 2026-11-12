@@ -5,6 +5,7 @@ import { adCallback, adClick, adMessage, annCallback, annMessage, listAds, start
 import { startSub, subCallback, subText } from "./admin-sub";
 import { markBack, markSick, sickList } from "./admin-sick";
 import { esc } from "./messages";
+import { adminMarketList, marketCallback, marketMessage } from "./market";
 import { orderCallback, orderText, startOrder } from "./order";
 import { BUTTONS, mainKeyboard, registrationCallback, scheduleCallback, settingsCallback, startRegistration, studentCommand } from "./student";
 import { answer, edit, send } from "./telegram";
@@ -29,6 +30,8 @@ const ADMIN_COMMANDS: Record<string, (chatId: number, rest: string) => Promise<u
   "/болеют": (id) => sickList(id),
   "/статистика": (id) => sendStats(id),
   "/stats": (id) => sendStats(id),
+  "/барахолка": (id) => adminMarketList(id),
+  "/mod": (id) => adminMarketList(id),
   "/админ": (id) => adminHelp(id),
   "/admin": (id) => adminHelp(id),
 };
@@ -44,6 +47,7 @@ const adminHelp = (chatId: number) =>
       "/болеет Фамилия (/sick) — преподаватель заболел, /вышел Фамилия (/back) — вышел, /болеют — список",
       "/объявление (/announce) — объявление",
       "/реклама (/ad) — запланировать рекламный пост, /ads — список",
+      "/барахолка (/mod) — объявления барахолки, удаление",
       "/статистика (/stats) — пользователи и охват рекламы",
       "/cancel — прервать текущий диалог",
     ].join("\n"),
@@ -120,6 +124,7 @@ async function handleMessage(m: TgMessage) {
 
   const session = getSession(chatId);
   if (session?.kind === "order") return orderText(chatId, text, session);
+  if (session?.kind === "market") return marketMessage(chatId, m, session);
   if (admin && session) {
     if (session.kind === "admin_menu") return handleMenuText(chatId, text);
     if (session.kind === "admin_duty" && session.step === "list") return saveDutyList(chatId, String(session.data.month), text, (session.data.dutyKind as "mik" | "mgu") || "mik");
@@ -147,6 +152,7 @@ async function handleCallback(q: TgCallback) {
   if (prefix === "set") return settingsCallback(chatId, messageId, data);
   if (prefix === "sch") return scheduleCallback(chatId, messageId, data, user);
   if (prefix === "ord") return orderCallback(chatId, messageId, data, getUser(chatId) ?? user, getSession(chatId));
+  if (prefix === "mk") return marketCallback(chatId, messageId, data, q.from, getSession(chatId));
   if (prefix === "adc") return adClick(chatId, Number(data.split(":")[1]));
   if (prefix === "noop") return;
 

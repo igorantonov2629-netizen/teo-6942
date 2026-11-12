@@ -80,6 +80,30 @@ CREATE TABLE IF NOT EXISTS ad_clicks (
   chat_id INTEGER NOT NULL,
   PRIMARY KEY (ad_id, chat_id)
 );
+CREATE TABLE IF NOT EXISTS listings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  username TEXT NOT NULL,
+  title TEXT NOT NULL,
+  price TEXT NOT NULL,
+  descr TEXT NOT NULL,
+  category TEXT NOT NULL,
+  photo TEXT,
+  status TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  renew_notified INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS listings_status ON listings (status, category);
+CREATE TABLE IF NOT EXISTS market_bans (
+  chat_id INTEGER PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS market_reports (
+  listing_id INTEGER NOT NULL,
+  chat_id INTEGER NOT NULL,
+  PRIMARY KEY (listing_id, chat_id)
+);
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

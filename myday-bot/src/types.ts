@@ -1,4 +1,4 @@
-export type TgUser = { id: number; is_bot?: boolean };
+export type TgUser = { id: number; is_bot?: boolean; username?: string };
 export type TgMessage = {
   message_id: number;
   from?: TgUser;
