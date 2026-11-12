@@ -19,11 +19,17 @@ export function sickPhrase(name: string) {
   return `${name} ${female ? "заболела" : "заболел"}`;
 }
 
-/** Если преподаватель пары болеет — его имя из списка, иначе null. */
+/** Полное имя в нижнем регистре без лишних пробелов: «Мазурик А.В.» → «мазурик а.в.». */
+export const fullKey = (teacher: string) => teacher.trim().toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ");
+
+/**
+ * Если преподаватель пары болеет — его имя из списка, иначе null.
+ * Ключ отметки — фамилия, а если однофамильцев несколько — полное имя.
+ */
 export function sickTeacher(l: Lesson | null): string | null {
   if (!l?.teacher) return null;
-  const key = surnameKey(l.teacher);
-  return listAbsences().find((a) => a.key === key)?.name ?? null;
+  const keys = [surnameKey(l.teacher), fullKey(l.teacher)];
+  return listAbsences().find((a) => keys.includes(a.key))?.name ?? null;
 }
 
 export function pairsWord(n: number) {

@@ -522,3 +522,17 @@ describe("резервная копия", () => {
     expect(restored.query("SELECT grp FROM users WHERE chat_id = 70").get()).toEqual({ grp: "501.21" });
   });
 });
+
+describe("однофамильцы", () => {
+  test("/болеет Мазурик просит уточнить, отметка только у нужного", async () => {
+    const { sickTeacher } = await import("../src/messages");
+    calls = [];
+    await msg(1, "/болеет Мазурик");
+    expect(textOf(sent(1).at(-1)!)).toContain("несколько");
+    await msg(1, "/болеет Мазурик А.В.");
+    expect(sickTeacher({ subject: "", teacher: "Мазурик А.В." })).toBe("Мазурик А.В.");
+    expect(sickTeacher({ subject: "", teacher: "Мазурик М.А." })).toBeNull();
+    await msg(1, "/вышел Мазурик"); // болеет только один — уточнять не нужно
+    expect(sickTeacher({ subject: "", teacher: "Мазурик А.В." })).toBeNull();
+  });
+});
