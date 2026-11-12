@@ -15,7 +15,7 @@ import type { TgMessage, TgUser } from "./types";
 
 export const MAX_ACTIVE = 3;
 export const LIFETIME_DAYS = 14;
-const COOLDOWN_MIN = 10;
+const COOLDOWN_MIN = 1;
 const DAY = 24 * 3600 * 1000;
 
 export const CATEGORIES: Record<string, string> = {

@@ -421,7 +421,7 @@ describe("барахолка", () => {
     expect(sent(1).filter((c) => textOf(c).includes("Жалоба")).length).toBe(1); // повторная жалоба не дублируется
   });
 
-  test("лимит 3 объявления и пауза 10 минут", async () => {
+  test("лимит 3 объявления и пауза 1 минута", async () => {
     await post(54, "a", "Раз");
     await post(54, "a", "Два");
     expect(listings().length).toBe(1); // пауза
