@@ -536,3 +536,121 @@ describe("однофамильцы", () => {
     expect(sickTeacher({ subject: "", teacher: "Мазурик А.В." })).toBeNull();
   });
 });
+
+describe("подработка", () => {
+  const cbu = (from: number, data: string, username?: string) =>
+    handleUpdate({ update_id: upd++, callback_query: { id: String(upd), from: { id: from, username }, data, message: { message_id: 5, chat: { id: from, type: "private" } } } });
+  const jobs = () => getDb().query<any, []>("SELECT * FROM jobs").all();
+  async function give(chatId: number, username = "client", text = "Забрать посылку с Озона") {
+    await cbu(chatId, "jb:new", username);
+    await cbu(chatId, "jb:cat:parcel", username);
+    await msg(chatId, text);
+    await msg(chatId, "200 ₽");
+    await cbu(chatId, "jb:dl:today", username);
+    await cbu(chatId, "jb:pub", username);
+  }
+
+  test("кнопка, размещение, копия админу, подписчику — уведомление", async () => {
+    await register(80, "501.21");
+    await cbu(81, "jb:sub", "worker");
+    calls = [];
+    await msg(80, "💰 Подработка");
+    expect(textOf(sent(80)[0])).toContain("Подработка");
+    await give(80);
+    const [j] = jobs();
+    expect(j).toMatchObject({ chat_id: 80, username: "client", text: "Забрать посылку с Озона", reward: "200 ₽", category: "parcel", status: "open" });
+    expect(sent(1).some((c) => textOf(c).includes("Новое задание #"))).toBe(true);
+    const sub = getDb().query<any, []>("SELECT * FROM job_subs WHERE chat_id = 81").get();
+    expect(sent(81).some((c) => textOf(c).includes("Новое задание")) || sub.pending === 1).toBe(true);
+    expect(sent(80).some((c) => textOf(c).includes("Новое задание"))).toBe(false); // автору не шлём
+  });
+
+  test("берёт только первый, задание пропадает из списка; выполнено и оценки", async () => {
+    await give(82);
+    const id = jobs()[0].id;
+    await cbu(83, `jb:take:${id}`, "first");
+    await cbu(84, `jb:take:${id}`, "second");
+    expect(jobs()[0]).toMatchObject({ status: "taken", worker_id: 83, worker_username: "first" });
+    expect(sent(84).some((c) => textOf(c).includes("успел раньше") || textOf(c).includes("уже взяли"))).toBe(true);
+    expect(JSON.stringify(sent(83).at(-1)!.params.reply_markup)).toContain("https://t.me/client");
+    expect(JSON.stringify(sent(82).at(-1)!.params.reply_markup)).toContain("https://t.me/first");
+    calls = [];
+    await cbu(84, "jb:l:0");
+    expect(textOf(calls.find((c) => c.method === "editMessageText")!)).toContain("Свободных заданий пока нет");
+    await cbu(84, `jb:done:${id}`); // не заказчик — нельзя
+    expect(jobs()[0].status).toBe("taken");
+    await cbu(82, `jb:done:${id}`);
+    expect(jobs()[0].status).toBe("done");
+    await cbu(82, `jb:rate:${id}:1`);
+    await cbu(82, `jb:rate:${id}:-1`); // повторно не меняется
+    await cbu(83, `jb:rate:${id}:1`);
+    const { reputation } = await import("../src/jobs");
+    expect(reputation(83, "worker")).toBe("✅ 1 · 👍 100%");
+    expect(reputation(82, "client")).toBe("✅ 1 · 👍 100%");
+  });
+
+  test("отказ исполнителя и возврат заказчиком — задание снова в списке", async () => {
+    await give(85);
+    const id = jobs()[0].id;
+    await cbu(86, `jb:take:${id}`, "w");
+    await cbu(86, `jb:drop:${id}`, "w");
+    expect(jobs()[0]).toMatchObject({ status: "open", worker_id: null });
+    await cbu(87, `jb:take:${id}`, "w2");
+    await cbu(85, `jb:back:${id}`);
+    expect(jobs()[0].status).toBe("open");
+    expect(sent(87).some((c) => textOf(c).includes("вернул задание"))).toBe(true);
+  });
+
+  test("свои задания брать нельзя, без username нельзя", async () => {
+    await give(88);
+    const id = jobs()[0].id;
+    await cbu(88, `jb:take:${id}`, "client");
+    await cbu(89, `jb:take:${id}`);
+    expect(jobs()[0].status).toBe("open");
+  });
+
+  test("срок, напоминание через сутки, автозакрытие через двое", async () => {
+    const { jobsTick } = await import("../src/jobs");
+    await give(90, "c", "Один");
+    await give(91, "d", "Два");
+    const [a, b] = jobs();
+    getDb().query("UPDATE jobs SET deadline = ? WHERE id = ?").run(Date.now() - 1, a.id);
+    await cbu(92, `jb:take:${b.id}`, "w");
+    getDb().query("UPDATE jobs SET taken_at = ? WHERE id = ?").run(Date.now() - 25 * 3600 * 1000, b.id);
+    calls = [];
+    await jobsTick(hm("3:00")); // ночью ничего
+    expect(jobs().map((j) => j.status)).toEqual(["open", "taken"]);
+    await jobsTick(hm("12:00"));
+    expect(jobs()[0].status).toBe("expired");
+    expect(sent(91).some((c) => textOf(c).includes("выполнено?"))).toBe(true);
+    await cbu(90, `jb:re:${a.id}`, "c");
+    expect(jobs()[0].status).toBe("open");
+    getDb().query("UPDATE jobs SET taken_at = ? WHERE id = ?").run(Date.now() - 49 * 3600 * 1000, b.id);
+    await jobsTick(hm("12:01"));
+    expect(jobs()[1].status).toBe("done");
+  });
+
+  test("учёба разрешена, пока выключены конспекты; потом — запрещена", async () => {
+    delete process.env.ORDERS_ENABLED;
+    await give(93, "s", "Написать реферат по истории");
+    expect(jobs().length).toBe(1);
+    process.env.ORDERS_ENABLED = "1";
+    try {
+      calls = [];
+      await give(94, "t", "Решить контрольную по математике");
+      expect(jobs().length).toBe(1);
+      expect(sent(94).some((c) => textOf(c).includes("больше не размещаются"))).toBe(true);
+    } finally {
+      delete process.env.ORDERS_ENABLED;
+    }
+  });
+
+  test("админ удаляет, не-админ — нет", async () => {
+    await give(95);
+    const id = jobs()[0].id;
+    await cbu(96, `jb:del:${id}`);
+    expect(jobs()[0].status).toBe("open");
+    await cbu(1, `jb:del:${id}`);
+    expect(jobs()[0].status).toBe("removed");
+  });
+});

@@ -25,6 +25,7 @@ const STUDENT_COMMANDS = [
   { command: "order", description: "Заказать конспект" },
   { command: "teacher", description: "Где преподаватель, его пары" },
   { command: "market", description: "Барахолка" },
+  { command: "jobs", description: "Подработка: задания за деньги" },
   { command: "settings", description: "Группа и уведомления" },
   { command: "support", description: "Поддержка" },
 ];
@@ -36,6 +37,7 @@ const ADMIN_COMMANDS = [
   { command: "ad", description: "Реклама (/реклама)" },
   { command: "ads", description: "Список рекламы" },
   { command: "mod", description: "Барахолка: модерация (/барахолка)" },
+  { command: "modjobs", description: "Подработка: модерация (/подработка)" },
   { command: "countdown", description: "Обратный отсчёт (/отсчёт)" },
   { command: "backup", description: "Копия базы (/бэкап)" },
   { command: "stats", description: "Статистика (/статистика)" },

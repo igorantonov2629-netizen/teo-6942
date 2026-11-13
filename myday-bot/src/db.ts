@@ -104,6 +104,41 @@ CREATE TABLE IF NOT EXISTS market_reports (
   chat_id INTEGER NOT NULL,
   PRIMARY KEY (listing_id, chat_id)
 );
+CREATE TABLE IF NOT EXISTS jobs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_id INTEGER NOT NULL,
+  username TEXT NOT NULL,
+  text TEXT NOT NULL,
+  reward TEXT NOT NULL,
+  category TEXT NOT NULL,
+  deadline INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  worker_id INTEGER,
+  worker_username TEXT,
+  created_at INTEGER NOT NULL,
+  taken_at INTEGER,
+  closed_at INTEGER,
+  remind_stage INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS jobs_status ON jobs (status);
+CREATE TABLE IF NOT EXISTS job_ratings (
+  job_id INTEGER NOT NULL,
+  rater_id INTEGER NOT NULL,
+  target_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  value INTEGER NOT NULL,
+  PRIMARY KEY (job_id, rater_id)
+);
+CREATE TABLE IF NOT EXISTS job_reports (
+  job_id INTEGER NOT NULL,
+  chat_id INTEGER NOT NULL,
+  PRIMARY KEY (job_id, chat_id)
+);
+CREATE TABLE IF NOT EXISTS job_subs (
+  chat_id INTEGER PRIMARY KEY,
+  last_push INTEGER NOT NULL DEFAULT 0,
+  pending INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS countdowns (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

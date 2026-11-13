@@ -4,6 +4,7 @@ import { adMarkup, adPost, AD_FROM, AD_TO, sendPost, stopAd, type Ad } from "./a
 import { dutyMissingText, menuMissingText, morningAt, upcomingMissingDuties } from "./admin-menu";
 import { sendBackup } from "./backup";
 import { marketTick, purgeOldListings } from "./market";
+import { jobsTick, purgeOldJobs as purgeClosedJobs } from "./jobs";
 import { mealReminderText, morningText, pairReminderText, tomorrowText } from "./messages";
 import { dayPairs, mealTime, PAIRS, type Meal } from "./schedule";
 import { broadcast, send } from "./telegram";
@@ -112,6 +113,7 @@ export async function tick(now: LocalNow = localNow()) {
     }
   }
   await runAds(now).catch((e) => console.error("Реклама:", (e as Error).message));
+  await jobsTick(now.minutes).catch((e) => console.error("Подработка:", (e as Error).message));
   await marketTick(now.minutes).catch((e) => console.error("Барахолка:", (e as Error).message));
   // Копия базы раз в день после 4:05 (если бот был выключен — при первом запуске после).
   if (now.minutes >= hm("4:05") && claimJob(`backup:${now.date}`))
@@ -120,6 +122,7 @@ export async function tick(now: LocalNow = localNow()) {
     purgeOldSessions();
     purgeOldJobs();
     purgeOldListings();
+    purgeClosedJobs();
   }
 }
 
