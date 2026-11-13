@@ -32,7 +32,7 @@ else ok(`папка базы: права ${mode(dirname(dbPath)).toString(8)}`);
 // --- 2. Схема: никаких персональных данных ---
 const db = new Database(dbPath, { readonly: true });
 const PII = /name|username|phone|first|last|email|address|birth|passport|message|text_in/i;
-const ALLOWED = new Set(["duties.name", "duties_mgu.name", "absences.name", "ads.text", "ads.button_text", "announcements.text", "listings.username", "jobs.username", "jobs.worker_username"]); // админские данные; username — продавец сам публикует его в объявлении
+const ALLOWED = new Set(["duties.name", "duties_mgu.name", "absences.name", "ads.text", "ads.button_text", "announcements.text", "listings.username", "jobs.username", "jobs.worker_username", "job_subs.last_push"]); // админские данные; username — продавец сам публикует его в объявлении
 for (const { name: table } of db.query<{ name: string }, []>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()) {
   for (const { name: col } of db.query<{ name: string }, []>(`PRAGMA table_info("${table}")`).all())
     if (PII.test(col) && !ALLOWED.has(`${table}.${col}`)) problems.push(`колонка ${table}.${col} похожа на персональные данные`);
