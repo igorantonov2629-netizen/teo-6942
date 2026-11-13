@@ -654,3 +654,16 @@ describe("подработка", () => {
     expect(jobs()[0].status).toBe("removed");
   });
 });
+
+describe("подработка: текст вместо кнопки категории", () => {
+  test("задание принимается как «Другое»", async () => {
+    const cbu = (from: number, data: string, username?: string) =>
+      handleUpdate({ update_id: upd++, callback_query: { id: String(upd), from: { id: from, username }, data, message: { message_id: 5, chat: { id: from, type: "private" } } } });
+    await cbu(97, "jb:new", "x");
+    await msg(97, "Сходить в магазин за хлебом");
+    await msg(97, "100 ₽");
+    await cbu(97, "jb:dl:3h", "x");
+    await cbu(97, "jb:pub", "x");
+    expect(getDb().query<any, []>("SELECT category, text, status FROM jobs").get()).toEqual({ category: "other", text: "Сходить в магазин за хлебом", status: "open" });
+  });
+});

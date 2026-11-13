@@ -189,6 +189,8 @@ function postBlocker(chatId: number, username?: string) {
 
 export async function jobMessage(chatId: number, m: TgMessage, s: Session) {
   const text = (m.text || "").trim();
+  // Написали задание сразу, не выбрав категорию, — принимаем как «Другое».
+  if (s.step === "cat" && text) s = { ...s, step: "text", data: { category: "other" } };
   if (s.step === "text") {
     if (!text || text.length > 300) return send(chatId, "Описание — от 1 до 300 символов.", { reply_markup: kb([cancelRow]) });
     if (!studyAllowed() && STUDY_WORDS.test(text))
