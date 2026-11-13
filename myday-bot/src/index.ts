@@ -49,15 +49,27 @@ const DESCRIPTION =
   "Вся информация жизни МИК!\nПриемы пищи, расписание, заказать конспекты - все, что тебе нужно уже здесь, в удобном интерфейсе!\n\nПоддержка - @sanekhelper";
 const SHORT_DESCRIPTION = "Вся информация жизни МИК! Поддержка - @sanekhelper";
 
+/** Сетевой сбой при запуске не должен ронять бота: повторяем до пяти раз. */
+async function retry<T>(fn: () => Promise<T>, tries = 5): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await Bun.sleep(2000 * i);
+    }
+  }
+}
+
 async function setup() {
   // Бот работает через long polling: никакого входящего HTTP-порта наружу.
-  await tg("deleteWebhook", { drop_pending_updates: false });
-  await tg("setMyCommands", { commands: STUDENT_COMMANDS });
+  await retry(() => tg("deleteWebhook", { drop_pending_updates: false }));
+  await retry(() => tg("setMyCommands", { commands: STUDENT_COMMANDS }));
   await tg("setMyDescription", { description: DESCRIPTION }).catch(() => null);
   await tg("setMyShortDescription", { short_description: SHORT_DESCRIPTION }).catch(() => null);
   for (const id of config.adminIds)
     await tg("setMyCommands", { commands: [...STUDENT_COMMANDS, ...ADMIN_COMMANDS], scope: { type: "chat", chat_id: id } }).catch(() => null);
-  const me = await tg<{ username: string }>("getMe");
+  const me = await retry(() => tg<{ username: string }>("getMe"));
   console.log(`Бот @${me.username} запущен. Часовой пояс: ${config.tz}.`);
 }
 
