@@ -1,6 +1,7 @@
 import { audienceChatIds, clearSession, getDb, setSession, type Audience, type Session } from "./db";
 import { audienceKeyboard, audienceLabel, audienceStep, groupsPicker } from "./admin-common";
 import { esc } from "./messages";
+import { enqueue } from "./outbox";
 import { broadcast, btn, edit, kb, safe, send, tg, type InlineKeyboard } from "./telegram";
 import { addDays, dowOf, hm, localNow, ruDate, WEEKDAYS_SHORT } from "./time";
 import { postFromMessage, type Post, type TgMessage } from "./types";
@@ -65,16 +66,10 @@ export async function annCallback(chatId: number, messageId: number, data: strin
   }
   if (data === "ann:send" && d.post && d.audience) {
     clearSession(chatId);
-    await edit(chatId, messageId, "⏳ Отправляю…");
-    const post = annPostText(d.post, d.important);
     const ids = audienceChatIds(d.audience, !!d.important);
-    const sent = await broadcast(ids, async (id) => {
-      const msg = (await sendPost(id, post)) as { message_id: number } | null;
-      if (msg && d.important)
-        await tg("pinChatMessage", { chat_id: id, message_id: msg.message_id, disable_notification: true }).catch(() => null);
-      return msg;
-    });
-    return edit(chatId, messageId, `✅ Объявление отправлено: ${sent} из ${ids.length}.`);
+    await edit(chatId, messageId, `⏳ Отправляю ${ids.length} получателям… Даже если бота перезапустят, рассылка продолжится сама.`);
+    // Через очередь в базе: рассылка переживает перезапуск бота.
+    enqueue(ids, { post: annPostText(d.post, d.important), pin: !!d.important }, { chat: chatId, msg: messageId });
   }
 }
 

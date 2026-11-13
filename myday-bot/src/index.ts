@@ -3,6 +3,7 @@ import { getUpdateOffset, openDb, setUpdateOffset } from "./db";
 import { seedDuties } from "./admin-menu";
 import { handleUpdate } from "./bot";
 import { startScheduler, stopScheduler } from "./scheduler";
+import { startOutbox, stopOutbox } from "./outbox";
 import { redact, tg } from "./telegram";
 import type { TgUpdate } from "./types";
 
@@ -88,9 +89,11 @@ for (const sig of ["SIGINT", "SIGTERM"] as const)
   process.on(sig, () => {
     stopping = true;
     stopScheduler();
+    stopOutbox();
     setTimeout(() => process.exit(0), 500);
   });
 
 await setup();
 startScheduler();
+startOutbox(); // заодно досылает объявление, оборванное перезапуском
 await poll();

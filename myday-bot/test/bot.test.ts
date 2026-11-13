@@ -667,3 +667,25 @@ describe("подработка: текст вместо кнопки катег�
     expect(getDb().query<any, []>("SELECT category, text, status FROM jobs").get()).toEqual({ category: "other", text: "Сходить в магазин за хлебом", status: "open" });
   });
 });
+
+describe("объявление через очередь", () => {
+  test("доходит всем; оборванная рассылка досылается после перезапуска", async () => {
+    const { drainOnce, pendingCount } = await import("../src/outbox");
+    for (const id of [101, 102, 103]) await register(id, "501.21");
+    await msg(1, "/объявление");
+    await msg(1, "Завтра построение в 8:00");
+    await cb(1, "ann:a:all");
+    calls = [];
+    await cb(1, "ann:send");
+    expect(pendingCount()).toBe(3); // записано в очередь
+    // «перезапуск»: часть получателей уже получила, бот упал
+    getDb().query("DELETE FROM outbox WHERE id = (SELECT MIN(id) FROM outbox)").run();
+    getDb().query("UPDATE outbox_batches SET sent = 1").run();
+    await drainOnce(0);
+    expect(pendingCount()).toBe(0);
+    const got = [101, 102, 103].filter((id) => sent(id).some((c) => textOf(c).includes("построение")));
+    expect(got).toEqual([102, 103]);
+    const done = calls.filter((c) => c.method === "editMessageText" && String(c.params.text).includes("Объявление отправлено"));
+    expect(String(done.at(-1)!.params.text)).toContain("3 из 3");
+  });
+});
