@@ -8,7 +8,7 @@ const { openDb, closeDb, getDb, getUser, saveOverride, getMenu } = await import(
 const { setTransport } = await import("../src/telegram");
 const { handleUpdate, statsText } = await import("../src/bot");
 const { TIMETABLE, LESSONS, COURSES } = await import("../src/schedule-data");
-const { weekType, dayPairs, place, groupSubjects } = await import("../src/schedule");
+const { weekType, dayPairs, place, groupSubjects, cellCodes } = await import("../src/schedule");
 const { morningText, tomorrowText, pairsWord } = await import("../src/messages");
 const { parseMenu, applyMenu, parseDuties, seedDuties, missingDutyDays } = await import("../src/admin-menu");
 const { orderMessage, orderLink, orderPrice } = await import("../src/order");
@@ -52,7 +52,7 @@ describe("данные расписания", () => {
       expect(TIMETABLE[g]).toHaveLength(6);
       for (const day of TIMETABLE[g]) {
         expect(day.length).toBeLessThanOrEqual(4);
-        for (const cell of day) for (const code of cell.split("/")) expect(code === "X" || !!LESSONS[code]).toBe(true);
+        for (const cell of day) for (const code of cellCodes(cell)) expect(!!LESSONS[code]).toBe(true);
       }
     }
   });
@@ -69,14 +69,19 @@ describe("верхняя/нижняя неделя", () => {
     expect(weekType("2026-11-23")).toBe("upper");
     expect(weekType("2026-11-02")).toBe("lower");
   });
-  test("пример из концепта: 501.21, вторник 10 ноября — 3 пары", () => {
+  test("501.21, вторник 10 ноября — 2 пары", () => {
     const text = morningText("501.21", "2026-11-10");
     expect(text).toContain("Вторник, 10 ноября");
-    expect(text).toContain("Группа 501.21 · верхняя неделя · 3 пары");
-    expect(text).toContain("Техническая механика");
-    expect(text).toContain("каб. 216, корпус 8 · Полисадина Е.В.");
+    expect(text).toContain("Группа 501.21 · верхняя неделя · 2 пары");
+    expect(text).toContain("Электротехника и электроника");
+    expect(text).toContain("каб. 504, корпус 8 · Степченко Н.Г.");
     expect(text).toContain("Дежурный по МИК на сегодня пока не указан");
-    expect(dayPairs("501.21", "2026-11-17")[3].lesson?.subject).toBe("Электротехника и электроника");
+    // пары с датами: история у 501.21 по вторникам только 01.12 и 15.12
+    expect(dayPairs("501.21", "2026-11-17")[3].lesson).toBeNull();
+    expect(dayPairs("501.21", "2026-12-01")[3].lesson?.subject).toBe("История");
+    // «с 27.11»: техмех у 501.21 в пятницу 2 парой
+    expect(dayPairs("501.21", "2026-11-20")[1].lesson).toBeNull();
+    expect(dayPairs("501.21", "2026-11-27")[1].lesson?.subject).toBe("Техническая механика");
   });
   test("дежурный и меню в утреннем сообщении", () => {
     seedDuties();
@@ -241,12 +246,12 @@ describe("болеющий преподаватель", () => {
     const { todayText, weekText } = await import("../src/messages");
     await msg(1, "/болеет малышев");
     expect(textOf(sent(1).at(-1)!)).toContain("Малышев С.А. заболел");
-    const t = todayText("501.21", "2026-11-10");
+    const t = todayText("501.23", "2026-11-09");
     expect(t).toContain("🤒 <i>Малышев С.А. заболел</i>");
     expect(t.match(/заболел/g)).toHaveLength(1); // только у пары Малышева
     expect(weekText("501.23", "2026-11-10")).toContain("🤒 Малышев С.А. заболел");
     await msg(1, "/вышел Малышев");
-    expect(todayText("501.21", "2026-11-10")).not.toContain("заболел");
+    expect(todayText("501.23", "2026-11-09")).not.toContain("заболел");
   });
   test("женская фамилия — «заболела»", async () => {
     const { sickPhrase } = await import("../src/messages");
@@ -277,7 +282,7 @@ describe("рассылки по расписанию", () => {
     calls = [];
     await tick({ ...day, minutes: hm("10:30") });
     expect(textOf(sent(30)[0])).toContain("Через 10 минут 2 пара");
-    expect(textOf(sent(30)[0])).toContain("каб. 511, корпус 8");
+    expect(textOf(sent(30)[0])).toContain("каб. 110, корпус 8");
     calls = [];
     await tick({ ...day, minutes: hm("14:50") }); // 4 пары нет на верхней неделе
     expect(sent(30)).toHaveLength(0);
@@ -486,8 +491,8 @@ describe("преподаватели", () => {
     const { searchTeachers, teacherText } = await import("../src/teachers");
     expect(searchTeachers("малыш")).toEqual(["Малышев С.А."]);
     expect(searchTeachers("Мазурик").length).toBe(2);
-    // вторник 10.11.2026, 9:30 — идёт 1 пара
-    const text = teacherText("Малышев С.А.", "today", { date: "2026-11-10", dow: 1, minutes: hm("9:30") });
+    // понедельник 9.11.2026, 12:30 — идёт 3 пара
+    const text = teacherText("Малышев С.А.", "today", { date: "2026-11-09", dow: 0, minutes: hm("12:30") });
     expect(text).toContain("Малышев С.А.");
     expect(text).toMatch(/пара/);
     const week = teacherText("Малышев С.А.", "week", { date: "2026-11-10", dow: 1, minutes: hm("9:30") });

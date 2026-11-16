@@ -35,10 +35,26 @@ export function weekType(date: string): WeekType {
 
 export const weekLabel = (w: WeekType) => (w === "upper" ? "верхняя неделя" : "нижняя неделя");
 
-/** Разбор одной ячейки таблицы с учётом недели. */
-export function resolveCell(cell: string, week: WeekType): Lesson | null {
+/**
+ * Половина ячейки может быть привязана к датам (месяц-день, год текущий):
+ *   "IST@11-16,11-30" — только в эти дни; "TMP@>11-23" — начиная с этой даты.
+ */
+function halfCode(half: string, date?: string): string {
+  const [code, spec] = half.split("@");
+  if (!spec || code === "X") return code;
+  if (!date) return code;
+  const md = date.slice(5);
+  const ok = spec.startsWith(">") ? md >= spec.slice(1) : spec.split(",").includes(md);
+  return ok ? code : "X";
+}
+
+/** Все коды занятий в ячейке (без дат). */
+export const cellCodes = (cell: string) => cell.split("/").map((h) => h.split("@")[0]).filter((c) => c !== "X");
+
+/** Разбор одной ячейки таблицы с учётом недели (и даты, если ячейка с датами). */
+export function resolveCell(cell: string, week: WeekType, date?: string): Lesson | null {
   const [up, down = up] = cell.split("/");
-  const code = week === "upper" ? up : down;
+  const code = halfCode(week === "upper" ? up : down, date);
   if (code === "X") return null;
   const lesson = LESSONS[code];
   if (!lesson) throw new Error(`Неизвестный код занятия: ${code}`);
@@ -51,7 +67,7 @@ export function baseDay(grp: string, date: string): (Lesson | null)[] {
   const days = TIMETABLE[grp];
   if (!days || dow > 5) return [];
   const week = weekType(date);
-  return days[dow].map((c) => resolveCell(c, week));
+  return days[dow].map((c) => resolveCell(c, week, date));
 }
 
 export type DayPair = {
@@ -91,6 +107,6 @@ export function groupSubjects(grp: string): string[] {
   const set = new Set<string>();
   for (const day of TIMETABLE[grp] || [])
     for (const cell of day)
-      for (const code of cell.split("/")) if (code !== "X" && LESSONS[code]) set.add(LESSONS[code].subject);
+      for (const code of cellCodes(cell)) if (LESSONS[code]) set.add(LESSONS[code].subject);
   return [...set];
 }

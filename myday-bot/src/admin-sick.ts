@@ -1,6 +1,7 @@
 import { addAbsence, listAbsences, removeAbsence } from "./db";
 import { esc, fullKey, sickPhrase, surnameKey } from "./messages";
 import { LESSONS, TIMETABLE } from "./schedule-data";
+import { cellCodes } from "./schedule";
 import { send } from "./telegram";
 
 const ALL_TEACHERS = [...new Set(Object.values(LESSONS).map((l) => l.teacher).filter((t): t is string => !!t))];
@@ -22,7 +23,7 @@ export const absenceKey = (name: string) =>
 /** Группы, у которых есть пары этого преподавателя. */
 export function teacherGroups(name: string) {
   return Object.entries(TIMETABLE)
-    .filter(([, days]) => days.some((d) => d.some((cell) => cell.split("/").some((c) => LESSONS[c]?.teacher === name))))
+    .filter(([, days]) => days.some((d) => d.some((cell) => cellCodes(cell).some((c) => LESSONS[c]?.teacher === name))))
     .map(([g]) => g);
 }
 
